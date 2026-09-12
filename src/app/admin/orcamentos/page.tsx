@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Check, ClipboardList, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Check, ClipboardList, Eye, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 
 type QuotationStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
 type QuotationItemType = 'PRODUCT' | 'SERVICE';
@@ -134,6 +134,7 @@ export default function AdminQuotationsPage() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
+  const [viewingQuotation, setViewingQuotation] = useState<Quotation | null>(null);
   const [quotationToDelete, setQuotationToDelete] = useState<Quotation | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -594,7 +595,7 @@ export default function AdminQuotationsPage() {
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Validade</TableHead>
-                {canManageQuotations && <TableHead className="text-right">Acoes</TableHead>}
+                <TableHead className="text-right">Acoes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -614,9 +615,18 @@ export default function AdminQuotationsPage() {
                   <TableCell className="font-mono text-xs text-brand-grey">
                     {quotation.valid_until ? new Date(`${quotation.valid_until}T00:00:00`).toLocaleDateString('pt-BR') : '-'}
                   </TableCell>
-                  {canManageQuotations && (
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setViewingQuotation(quotation)}
+                        title="Visualizar orcamento"
+                        className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-white"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      {canManageQuotations && (
+                        <>
                         <button
                           type="button"
                           onClick={() => openEditModal(quotation)}
@@ -633,15 +643,108 @@ export default function AdminQuotationsPage() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
-                      </div>
-                    </TableCell>
-                  )}
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
       </Card>
+
+      {viewingQuotation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs">
+          <Card className="w-full max-w-4xl mx-4 relative p-6 space-y-6 max-h-[90vh] overflow-y-auto" withStripe>
+            <button
+              type="button"
+              onClick={() => setViewingQuotation(null)}
+              className="absolute top-4 right-4 text-brand-grey hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="pr-8">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-black italic uppercase tracking-tight text-white">
+                    {viewingQuotation.title}
+                  </h3>
+                  <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
+                    #{viewingQuotation.id.slice(0, 8).toUpperCase()}
+                  </p>
+                </div>
+                <Badge variant={statusVariants[viewingQuotation.status]}>
+                  {statusLabels[viewingQuotation.status]}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="border border-brand-grey/15 bg-brand-black/50 p-4">
+                <p className="text-[10px] font-mono uppercase tracking-widest text-brand-grey">Cliente</p>
+                <p className="mt-2 text-sm font-bold text-white">{viewingQuotation.customer_name || 'Sem cliente anexado'}</p>
+                <p className="mt-1 text-[11px] font-mono text-brand-grey">{viewingQuotation.customer_email || viewingQuotation.customer_phone || '-'}</p>
+              </div>
+              <div className="border border-brand-grey/15 bg-brand-black/50 p-4">
+                <p className="text-[10px] font-mono uppercase tracking-widest text-brand-grey">Veiculo</p>
+                <p className="mt-2 text-sm font-bold text-white">{viewingQuotation.vehicle_info || '-'}</p>
+              </div>
+              <div className="border border-brand-grey/15 bg-brand-black/50 p-4">
+                <p className="text-[10px] font-mono uppercase tracking-widest text-brand-grey">Validade</p>
+                <p className="mt-2 text-sm font-bold text-white">
+                  {viewingQuotation.valid_until ? new Date(`${viewingQuotation.valid_until}T00:00:00`).toLocaleDateString('pt-BR') : '-'}
+                </p>
+              </div>
+            </div>
+
+            <div className="border border-brand-grey/15">
+              <div className="grid grid-cols-[1fr_90px_120px_120px] gap-3 border-b border-brand-grey/15 bg-brand-black/60 px-4 py-3 text-[10px] font-mono uppercase tracking-widest text-brand-grey">
+                <span>Item</span>
+                <span className="text-right">Qtd</span>
+                <span className="text-right">Unitario</span>
+                <span className="text-right">Total</span>
+              </div>
+              {(viewingQuotation.quotation_items || []).length === 0 ? (
+                <div className="px-4 py-8 text-center text-xs text-brand-grey">Nenhum item registrado.</div>
+              ) : (
+                <div className="divide-y divide-brand-grey/10">
+                  {(viewingQuotation.quotation_items || []).map((item) => (
+                    <div key={item.id} className="grid grid-cols-[1fr_90px_120px_120px] gap-3 px-4 py-3 text-xs">
+                      <div>
+                        <p className="font-bold text-white">{item.description}</p>
+                        <p className="mt-1 text-[10px] font-mono uppercase text-brand-grey">{item.item_type === 'PRODUCT' ? 'Produto' : 'Servico'}</p>
+                      </div>
+                      <span className="text-right font-mono text-brand-silver">{item.quantity}</span>
+                      <span className="text-right font-mono text-brand-silver">{money(item.unit_price)}</span>
+                      <span className="text-right font-mono font-bold text-white">{money(item.total_price)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-4">
+              <div className="border border-brand-grey/15 bg-brand-black/50 p-4">
+                <p className="text-[10px] font-mono uppercase tracking-widest text-brand-grey">Observacoes</p>
+                <p className="mt-2 text-xs leading-relaxed text-brand-silver">{viewingQuotation.notes || '-'}</p>
+              </div>
+              <div className="border border-brand-grey/15 bg-brand-black/60 p-4 space-y-3 font-mono text-xs">
+                <div className="flex justify-between text-brand-grey"><span>Subtotal</span><span>{money(viewingQuotation.subtotal)}</span></div>
+                <div className="flex justify-between text-brand-grey"><span>Desconto</span><span>{money(viewingQuotation.discount_amount)}</span></div>
+                <div className="flex justify-between text-white text-base font-black border-t border-brand-grey/15 pt-3"><span>Total</span><span>{money(viewingQuotation.total_amount)}</span></div>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-brand-grey/10 pt-5">
+              <Button type="button" variant="secondary" onClick={() => setViewingQuotation(null)}>
+                Fechar
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-xs">
