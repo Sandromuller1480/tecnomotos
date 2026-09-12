@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -11,7 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Check, ClipboardList, Eye, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Check, ClipboardList, Eye, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import whatsappIcon from '../../../../inagens/ícone whatsapp.png';
 
 type QuotationStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
 type QuotationItemType = 'PRODUCT' | 'SERVICE';
@@ -117,6 +119,7 @@ const emptyItem = (): QuotationItemForm => ({
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const getErrorMessage = (err: unknown, fallback: string) => err instanceof Error ? err.message : fallback;
+const onlyDigits = (value: string | null | undefined) => (value || '').replace(/\D/g, '');
 
 export default function AdminQuotationsPage() {
   const router = useRouter();
@@ -151,6 +154,7 @@ export default function AdminQuotationsPage() {
   const [status, setStatus] = useState<QuotationStatus>('DRAFT');
   const [discountAmount, setDiscountAmount] = useState('');
   const [notes, setNotes] = useState('');
+  const [generatePdf, setGeneratePdf] = useState(true);
   const [items, setItems] = useState<QuotationItemForm[]>([emptyItem()]);
 
   const fetchQuotations = async () => {
@@ -309,6 +313,7 @@ export default function AdminQuotationsPage() {
     setStatus('DRAFT');
     setDiscountAmount('');
     setNotes('');
+    setGeneratePdf(true);
     setItems([emptyItem()]);
   };
 
@@ -331,6 +336,7 @@ export default function AdminQuotationsPage() {
     setStatus(quotation.status);
     setDiscountAmount(String(quotation.discount_amount || ''));
     setNotes(quotation.notes || '');
+    setGeneratePdf(true);
     setItems(
       quotation.quotation_items && quotation.quotation_items.length > 0
         ? quotation.quotation_items.map((item) => ({
@@ -343,6 +349,23 @@ export default function AdminQuotationsPage() {
         : [emptyItem()]
     );
     setIsCreateModalOpen(true);
+  };
+
+  const getPdfUrl = (quotationId: string) => `/api/orcamentos/${quotationId}/pdf`;
+
+  const openQuotationPdf = (quotation: Quotation) => {
+    window.open(getPdfUrl(quotation.id), '_blank', 'noopener,noreferrer');
+  };
+
+  const sendQuotationToWhatsapp = (quotation: Quotation) => {
+    const phone = onlyDigits(quotation.customer_phone);
+    const pdfUrl = `${window.location.origin}${getPdfUrl(quotation.id)}`;
+    const message = `Olá${quotation.customer_name ? `, ${quotation.customer_name}` : ''}! Segue o orçamento ${quotation.title} em PDF: ${pdfUrl}`;
+    const whatsappUrl = phone
+      ? `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
 
   const updateItem = (index: number, patch: Partial<QuotationItemForm>) => {
@@ -477,6 +500,9 @@ export default function AdminQuotationsPage() {
       await fetchQuotations();
       setIsCreateModalOpen(false);
       setEditingQuotation(null);
+      if (generatePdf) {
+        window.open(getPdfUrl(quotationId), '_blank', 'noopener,noreferrer');
+      }
       resetForm();
       setShowSuccessOverlay(true);
       success('Orçamento gerado', 'O orçamento foi salvo no banco de dados.');
@@ -625,6 +651,22 @@ export default function AdminQuotationsPage() {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => openQuotationPdf(quotation)}
+                        title="Abrir PDF do orcamento"
+                        className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-white"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => sendQuotationToWhatsapp(quotation)}
+                        title="Enviar orcamento por WhatsApp"
+                        className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black transition-colors hover:border-[#25D366]"
+                      >
+                        <Image src={whatsappIcon} alt="" className="h-4 w-4 object-contain" />
+                      </button>
                       {canManageQuotations && (
                         <>
                         <button
@@ -737,7 +779,20 @@ export default function AdminQuotationsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end border-t border-brand-grey/10 pt-5">
+            <div className="flex flex-wrap justify-end gap-3 border-t border-brand-grey/10 pt-5">
+              <Button type="button" variant="secondary" onClick={() => openQuotationPdf(viewingQuotation)}>
+                <FileText className="w-4 h-4" /> Abrir PDF
+              </Button>
+              <button
+                type="button"
+                onClick={() => sendQuotationToWhatsapp(viewingQuotation)}
+                className="inline-flex items-center justify-center gap-2 border border-[#25D366]/50 bg-brand-darkgrey px-5 py-2.5 text-sm font-bold uppercase tracking-wider text-white transition-all duration-200 skew-x-[-6deg] hover:border-[#25D366] hover:bg-[#25D366]/10"
+              >
+                <span className="skew-x-[6deg] inline-flex items-center gap-2">
+                  <Image src={whatsappIcon} alt="" className="h-4 w-4 object-contain" />
+                  WhatsApp
+                </span>
+              </button>
               <Button type="button" variant="secondary" onClick={() => setViewingQuotation(null)}>
                 Fechar
               </Button>
@@ -760,13 +815,25 @@ export default function AdminQuotationsPage() {
               <X className="w-5 h-5" />
             </button>
 
-            <div>
-              <h3 className="text-lg font-black italic uppercase tracking-tight text-white">
-                {editingQuotation ? 'Editar Orcamento' : 'Gerar Orcamento'}
-              </h3>
-              <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
-                Monte uma proposta com cliente cadastrado ou atendimento avulso
-              </p>
+            <div className="flex flex-wrap items-start justify-between gap-4 pr-8">
+              <div>
+                <h3 className="text-lg font-black italic uppercase tracking-tight text-white">
+                  {editingQuotation ? 'Editar Orcamento' : 'Gerar Orcamento'}
+                </h3>
+                <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
+                  Monte uma proposta com cliente cadastrado ou atendimento avulso
+                </p>
+              </div>
+              {editingQuotation && (
+                <button
+                  type="button"
+                  onClick={() => sendQuotationToWhatsapp(editingQuotation)}
+                  className="inline-flex h-10 items-center justify-center gap-2 border border-[#25D366]/50 bg-brand-black px-4 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:border-[#25D366] hover:bg-[#25D366]/10"
+                >
+                  <Image src={whatsappIcon} alt="" className="h-4 w-4 object-contain" />
+                  WhatsApp
+                </button>
+              )}
             </div>
 
             <form onSubmit={handleSaveQuotation} className="space-y-5 text-left">
@@ -851,6 +918,15 @@ export default function AdminQuotationsPage() {
                   <label className="text-[10px] font-mono text-brand-grey uppercase">Desconto R$</label>
                   <Input inputMode="decimal" value={discountAmount} onChange={(event) => setDiscountAmount(event.target.value)} placeholder="0,00" />
                 </div>
+                <label className="md:col-span-2 flex items-center gap-3 border border-brand-grey/15 bg-brand-black/50 p-3 text-xs font-mono uppercase tracking-wider text-white">
+                  <input
+                    type="checkbox"
+                    checked={generatePdf}
+                    onChange={(event) => setGeneratePdf(event.target.checked)}
+                    className="h-4 w-4 accent-brand-red"
+                  />
+                  Gerar PDF do orcamento ao salvar
+                </label>
               </div>
 
               <div className="space-y-3">
