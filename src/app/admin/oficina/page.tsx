@@ -71,6 +71,14 @@ interface MechanicOption {
   full_name: string;
 }
 
+interface ProductOption {
+  id: string;
+  name: string;
+  sku: string | null;
+  price: number;
+  stock_quantity: number | null;
+}
+
 type ChecklistStatus = 'OK' | 'ATTENTION' | 'DAMAGED' | 'NOT_APPLICABLE';
 
 interface ChecklistItem {
@@ -88,6 +96,30 @@ interface ServiceOrderPhoto {
   storage_path: string;
   caption: string | null;
   created_at: string;
+}
+
+interface ServiceOrderProduct {
+  id?: string;
+  product_id: string | null;
+  product_name: string;
+  product_sku: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
+interface ProductRow {
+  id: string;
+  name: string;
+  sku: string | null;
+  price: number | string | null;
+  stock_quantity: number | null;
+}
+
+interface ServiceOrderProductRow extends Omit<ServiceOrderProduct, 'quantity' | 'unit_price' | 'total_price'> {
+  quantity: number | string | null;
+  unit_price: number | string | null;
+  total_price: number | string | null;
 }
 
 const DEFAULT_CHECKLIST_ITEMS: ChecklistItem[] = [
@@ -112,6 +144,7 @@ export default function AdminWorkshopPage() {
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [mechanics, setMechanics] = useState<MechanicOption[]>([]);
   const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
@@ -143,6 +176,9 @@ export default function AdminWorkshopPage() {
   const [eTotalPrice, setETotalPrice] = useState('');
   const [eNotes, setENotes] = useState('');
   const [eChecklistItems, setEChecklistItems] = useState<ChecklistItem[]>([]);
+  const [serviceOrderProducts, setServiceOrderProducts] = useState<ServiceOrderProduct[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedProductQuantity, setSelectedProductQuantity] = useState('1');
   const [serviceOrderPhotos, setServiceOrderPhotos] = useState<ServiceOrderPhoto[]>([]);
   const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
 
@@ -263,6 +299,19 @@ export default function AdminWorkshopPage() {
         };
       });
       setMechanics(formattedEmps);
+
+      const { data: prods } = await supabase
+        .from('products')
+        .select('id, name, sku, price, stock_quantity')
+        .order('name', { ascending: true });
+
+      setProducts(((prods || []) as ProductRow[]).map((product) => ({
+        id: product.id,
+        name: product.name,
+        sku: product.sku || null,
+        price: parseFloat(String(product.price)) || 0,
+        stock_quantity: product.stock_quantity ?? null
+      })));
     } catch (e) {
       console.warn('[Workshop] Error fetching form options:', e);
     }
@@ -364,6 +413,48 @@ export default function AdminWorkshopPage() {
     if (photoErr) throw photoErr;
   };
 
+  const handleAddServiceOrderProduct = () => {
+    const product = products.find((item) => item.id === selectedProductId);
+    const quantity = parseFloat(selectedProductQuantity.replace(',', '.')) || 0;
+
+    if (!product || quantity <= 0) {
+      error('Produto obrigatorio', 'Selecione um produto e informe uma quantidade valida.');
+      return;
+    }
+
+    const existingIndex = serviceOrderProducts.findIndex((item) => item.product_id === product.id);
+    const nextItem: ServiceOrderProduct = {
+      product_id: product.id,
+      product_name: product.name,
+      product_sku: product.sku,
+      quantity,
+      unit_price: product.price,
+      total_price: quantity * product.price
+    };
+
+    setServiceOrderProducts((current) => {
+      if (existingIndex === -1) return [...current, nextItem];
+
+      return current.map((item, index) => {
+        if (index !== existingIndex) return item;
+        const nextQuantity = item.quantity + quantity;
+        return {
+          ...item,
+          quantity: nextQuantity,
+          unit_price: product.price,
+          total_price: nextQuantity * product.price
+        };
+      });
+    });
+
+    setSelectedProductId('');
+    setSelectedProductQuantity('1');
+  };
+
+  const handleRemoveServiceOrderProduct = (index: number) => {
+    setServiceOrderProducts((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
   const resetCreateForm = () => {
     setSelectedCustId('');
     setSelectedVehId('');
@@ -447,6 +538,9 @@ export default function AdminWorkshopPage() {
     setEDescription(so.description || '');
     setETotalPrice(so.total_price.toString());
     setENotes(so.notes || '');
+    setServiceOrderProducts([]);
+    setSelectedProductId('');
+    setSelectedProductQuantity('1');
     setNewPhotoFiles([]);
     setIsDetailModalOpen(true);
 
@@ -474,6 +568,24 @@ export default function AdminWorkshopPage() {
       .order('created_at', { ascending: false });
 
     setServiceOrderPhotos(photos || []);
+
+    const { data: orderProducts, error: orderProductsErr } = await supabase
+      .from('service_order_products')
+      .select('id, product_id, product_name, product_sku, quantity, unit_price, total_price')
+      .eq('service_order_id', so.id)
+      .order('created_at', { ascending: true });
+
+    if (!orderProductsErr) {
+      setServiceOrderProducts(((orderProducts || []) as ServiceOrderProductRow[]).map((item) => ({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        product_sku: item.product_sku,
+        quantity: parseFloat(String(item.quantity)) || 0,
+        unit_price: parseFloat(String(item.unit_price)) || 0,
+        total_price: parseFloat(String(item.total_price)) || 0
+      })));
+    }
   };
 
   const handleUpdateSO = async (e: React.FormEvent) => {
@@ -512,6 +624,29 @@ export default function AdminWorkshopPage() {
         })));
 
       if (checklistErr) throw checklistErr;
+
+      const { error: deleteProductsErr } = await supabase
+        .from('service_order_products')
+        .delete()
+        .eq('service_order_id', selectedSO.id);
+
+      if (deleteProductsErr) throw deleteProductsErr;
+
+      if (serviceOrderProducts.length > 0) {
+        const { error: productsErr } = await supabase
+          .from('service_order_products')
+          .insert(serviceOrderProducts.map((item) => ({
+            service_order_id: selectedSO.id,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            product_sku: item.product_sku,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price
+          })));
+
+        if (productsErr) throw productsErr;
+      }
 
       await uploadServiceOrderPhotos(selectedSO.id, newPhotoFiles);
 
@@ -1047,6 +1182,65 @@ export default function AdminWorkshopPage() {
                     value={eTotalPrice}
                     onChange={(e) => setETotalPrice(e.target.value)}
                   />
+                </div>
+
+                <div className="space-y-3 md:col-span-2 border border-brand-grey/15 bg-brand-black/40 p-3">
+                  <div className="flex items-center justify-between border-b border-brand-grey/10 pb-2">
+                    <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-brand-red" /> Produto da Ordem de Servico
+                    </h4>
+                    <span className="text-[10px] font-mono text-brand-grey">
+                      Total em produtos: R$ {serviceOrderProducts.reduce((sum, item) => sum + item.total_price, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_100px_150px] gap-2">
+                    <select
+                      value={selectedProductId}
+                      onChange={(e) => setSelectedProductId(e.target.value)}
+                      className="w-full text-xs font-mono bg-brand-input border border-brand-grey/25 text-white rounded px-3 py-2 focus:outline-none focus:border-brand-red"
+                    >
+                      <option value="">Selecione um produto</option>
+                      {products.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name} - R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </option>
+                      ))}
+                    </select>
+                    <Input
+                      inputMode="decimal"
+                      value={selectedProductQuantity}
+                      onChange={(e) => setSelectedProductQuantity(e.target.value)}
+                      placeholder="Qtd"
+                      className="text-xs font-mono"
+                    />
+                    <Button type="button" variant="secondary" onClick={handleAddServiceOrderProduct}>
+                      <Plus className="w-3.5 h-3.5" /> Adicionar
+                    </Button>
+                  </div>
+
+                  {serviceOrderProducts.length > 0 && (
+                    <div className="space-y-2">
+                      {serviceOrderProducts.map((item, index) => (
+                        <div key={`${item.product_id}-${index}`} className="grid grid-cols-1 md:grid-cols-[1fr_80px_110px_40px] gap-2 items-center bg-brand-input/50 border border-brand-grey/10 rounded p-2">
+                          <div>
+                            <p className="text-xs font-bold text-white">{item.product_name}</p>
+                            <p className="text-[10px] font-mono text-brand-grey">{item.product_sku || 'Sem SKU'}</p>
+                          </div>
+                          <span className="text-xs font-mono text-brand-silver">Qtd {item.quantity}</span>
+                          <span className="text-xs font-mono text-white text-right">R$ {item.total_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveServiceOrderProduct(index)}
+                            className="h-9 border border-brand-grey/25 text-brand-grey hover:text-brand-red"
+                            aria-label="Remover produto"
+                          >
+                            <Trash2 className="w-4 h-4 mx-auto" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1 md:col-span-2">
