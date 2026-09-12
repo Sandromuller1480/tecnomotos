@@ -463,6 +463,9 @@ export default function AdminWorkshopPage() {
     setDescription('');
     setTotalPrice('');
     setNotes('');
+    setServiceOrderProducts([]);
+    setSelectedProductId('');
+    setSelectedProductQuantity('1');
     setChecklistItems(DEFAULT_CHECKLIST_ITEMS);
     setPhotoFiles([]);
   };
@@ -505,6 +508,22 @@ export default function AdminWorkshopPage() {
         })));
 
       if (checklistErr) throw checklistErr;
+
+      if (serviceOrderProducts.length > 0) {
+        const { error: productsErr } = await supabase
+          .from('service_order_products')
+          .insert(serviceOrderProducts.map((item) => ({
+            service_order_id: orderId,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            product_sku: item.product_sku,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price
+          })));
+
+        if (productsErr) throw productsErr;
+      }
 
       await uploadServiceOrderPhotos(orderId, photoFiles);
 
@@ -737,7 +756,13 @@ export default function AdminWorkshopPage() {
             </p>
           </div>
           {isOwner && (
-            <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                resetCreateForm();
+                setIsCreateModalOpen(true);
+              }}
+            >
               <Plus className="w-4 h-4 mr-1" /> Nova Ordem de Serviço
             </Button>
           )}
@@ -942,6 +967,65 @@ export default function AdminWorkshopPage() {
                     value={totalPrice}
                     onChange={(e) => setTotalPrice(e.target.value)}
                   />
+                </div>
+
+                <div className="space-y-3 md:col-span-2 border border-brand-grey/15 bg-brand-black/40 p-3">
+                  <div className="flex items-center justify-between border-b border-brand-grey/10 pb-2">
+                    <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-brand-red" /> Produto da Ordem de Servico
+                    </h4>
+                    <span className="text-[10px] font-mono text-brand-grey">
+                      Total em produtos: R$ {serviceOrderProducts.reduce((sum, item) => sum + item.total_price, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_100px_150px] gap-2">
+                    <select
+                      value={selectedProductId}
+                      onChange={(e) => setSelectedProductId(e.target.value)}
+                      className="w-full text-xs font-mono bg-brand-input border border-brand-grey/25 text-white rounded px-3 py-2 focus:outline-none focus:border-brand-red"
+                    >
+                      <option value="">Selecione um produto</option>
+                      {products.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name} - R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </option>
+                      ))}
+                    </select>
+                    <Input
+                      inputMode="decimal"
+                      value={selectedProductQuantity}
+                      onChange={(e) => setSelectedProductQuantity(e.target.value)}
+                      placeholder="Qtd"
+                      className="text-xs font-mono"
+                    />
+                    <Button type="button" variant="secondary" onClick={handleAddServiceOrderProduct}>
+                      <Plus className="w-3.5 h-3.5" /> Adicionar
+                    </Button>
+                  </div>
+
+                  {serviceOrderProducts.length > 0 && (
+                    <div className="space-y-2">
+                      {serviceOrderProducts.map((item, index) => (
+                        <div key={`${item.product_id}-${index}`} className="grid grid-cols-1 md:grid-cols-[1fr_80px_110px_40px] gap-2 items-center bg-brand-input/50 border border-brand-grey/10 rounded p-2">
+                          <div>
+                            <p className="text-xs font-bold text-white">{item.product_name}</p>
+                            <p className="text-[10px] font-mono text-brand-grey">{item.product_sku || 'Sem SKU'}</p>
+                          </div>
+                          <span className="text-xs font-mono text-brand-silver">Qtd {item.quantity}</span>
+                          <span className="text-xs font-mono text-white text-right">R$ {item.total_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveServiceOrderProduct(index)}
+                            className="h-9 border border-brand-grey/25 text-brand-grey hover:text-brand-red"
+                            aria-label="Remover produto"
+                          >
+                            <Trash2 className="w-4 h-4 mx-auto" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1 md:col-span-2">
