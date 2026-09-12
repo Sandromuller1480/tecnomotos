@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Check, ClipboardList, Plus, Search, Trash2, X } from 'lucide-react';
+import { Check, ClipboardList, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 
 type QuotationStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
 type QuotationItemType = 'PRODUCT' | 'SERVICE';
@@ -41,6 +41,7 @@ interface QuotationItemForm {
 interface QuotationItem {
   id: string;
   item_type: QuotationItemType;
+  product_id: string | null;
   description: string;
   quantity: number;
   unit_price: number;
@@ -63,6 +64,31 @@ interface Quotation {
   notes: string | null;
   created_at: string;
   quotation_items?: QuotationItem[];
+}
+
+interface QuotationItemRow extends Omit<QuotationItem, 'quantity' | 'unit_price' | 'total_price'> {
+  quantity: number | string | null;
+  unit_price: number | string | null;
+  total_price: number | string | null;
+}
+
+interface QuotationRow extends Omit<Quotation, 'subtotal' | 'discount_amount' | 'total_amount' | 'quotation_items'> {
+  subtotal: number | string | null;
+  discount_amount: number | string | null;
+  total_amount: number | string | null;
+  quotation_items?: QuotationItemRow[] | null;
+}
+
+interface CustomerProfileRow {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  customers: { id: string } | { id: string }[] | null;
+}
+
+interface ProductRow extends Omit<ProductOption, 'price'> {
+  price: number | string | null;
 }
 
 const statusLabels: Record<QuotationStatus, string> = {
@@ -90,6 +116,7 @@ const emptyItem = (): QuotationItemForm => ({
 });
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const getErrorMessage = (err: unknown, fallback: string) => err instanceof Error ? err.message : fallback;
 
 export default function AdminQuotationsPage() {
   const router = useRouter();
@@ -101,12 +128,17 @@ export default function AdminQuotationsPage() {
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [canCreate, setCanCreate] = useState(false);
+  const [canManageQuotations, setCanManageQuotations] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
+  const [quotationToDelete, setQuotationToDelete] = useState<Quotation | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [showDeleteSuccessOverlay, setShowDeleteSuccessOverlay] = useState(false);
   const [attachCustomer, setAttachCustomer] = useState(true);
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -141,6 +173,7 @@ export default function AdminQuotationsPage() {
         quotation_items (
           id,
           item_type,
+          product_id,
           description,
           quantity,
           unit_price,
@@ -158,12 +191,12 @@ export default function AdminQuotationsPage() {
       throw fetchErr;
     }
 
-    setQuotations((data || []).map((quotation: any) => ({
+    setQuotations(((data || []) as QuotationRow[]).map((quotation) => ({
       ...quotation,
       subtotal: parseFloat(String(quotation.subtotal)) || 0,
       discount_amount: parseFloat(String(quotation.discount_amount)) || 0,
       total_amount: parseFloat(String(quotation.total_amount)) || 0,
-      quotation_items: (quotation.quotation_items || []).map((item: any) => ({
+      quotation_items: (quotation.quotation_items || []).map((item) => ({
         ...item,
         quantity: parseFloat(String(item.quantity)) || 0,
         unit_price: parseFloat(String(item.unit_price)) || 0,
@@ -186,9 +219,9 @@ export default function AdminQuotationsPage() {
 
     if (fetchErr) throw fetchErr;
 
-    setCustomers((data || [])
-      .filter((profile: any) => profile.customers)
-      .map((profile: any) => ({
+    setCustomers(((data || []) as CustomerProfileRow[])
+      .filter((profile) => profile.customers)
+      .map((profile) => ({
         id: profile.id,
         full_name: profile.full_name || 'Cliente sem nome',
         email: profile.email || '',
@@ -202,7 +235,7 @@ export default function AdminQuotationsPage() {
       .select('id, name, sku, price')
       .order('name', { ascending: true });
 
-    setProducts((data || []).map((product: any) => ({
+    setProducts(((data || []) as ProductRow[]).map((product) => ({
       ...product,
       price: parseFloat(String(product.price)) || 0
     })));
@@ -231,11 +264,17 @@ export default function AdminQuotationsPage() {
         required_permission: 'orders.create'
       });
 
+      const { data: isOwner } = await supabase.rpc('is_owner', {
+        user_uuid: user.id
+      });
+
       setCanCreate(Boolean(hasCreate));
+      setCanManageQuotations(Boolean(isOwner));
       await Promise.all([fetchQuotations(), fetchCustomers(), fetchProducts()]);
       setIsLoading(false);
 
       if (window.location.search.includes('novo=1')) {
+        setEditingQuotation(null);
         setIsCreateModalOpen(true);
       }
     }
@@ -272,6 +311,39 @@ export default function AdminQuotationsPage() {
     setItems([emptyItem()]);
   };
 
+  const openCreateModal = () => {
+    setEditingQuotation(null);
+    resetForm();
+    setIsCreateModalOpen(true);
+  };
+
+  const openEditModal = (quotation: Quotation) => {
+    setEditingQuotation(quotation);
+    setAttachCustomer(Boolean(quotation.customer_id));
+    setCustomerId(quotation.customer_id || '');
+    setCustomerName(quotation.customer_name || '');
+    setCustomerEmail(quotation.customer_email || '');
+    setCustomerPhone(quotation.customer_phone || '');
+    setTitle(quotation.title);
+    setVehicleInfo(quotation.vehicle_info || '');
+    setValidUntil(quotation.valid_until || '');
+    setStatus(quotation.status);
+    setDiscountAmount(String(quotation.discount_amount || ''));
+    setNotes(quotation.notes || '');
+    setItems(
+      quotation.quotation_items && quotation.quotation_items.length > 0
+        ? quotation.quotation_items.map((item) => ({
+            item_type: item.item_type,
+            product_id: item.product_id || '',
+            description: item.description,
+            quantity: String(item.quantity),
+            unit_price: String(item.unit_price)
+          }))
+        : [emptyItem()]
+    );
+    setIsCreateModalOpen(true);
+  };
+
   const updateItem = (index: number, patch: Partial<QuotationItemForm>) => {
     setItems((current) => current.map((item, itemIndex) => {
       if (itemIndex !== index) return item;
@@ -293,10 +365,15 @@ export default function AdminQuotationsPage() {
 
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
 
-  const handleCreateQuotation = async (event: React.FormEvent) => {
+  const handleSaveQuotation = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!canCreate) {
+    if (!editingQuotation && !canCreate) {
       error('Sem permissão', 'Você não tem permissão para criar orçamentos.');
+      return;
+    }
+
+    if (editingQuotation && !canManageQuotations) {
+      error('Sem permissão', 'Você não tem permissão para editar orçamentos.');
       return;
     }
 
@@ -336,28 +413,61 @@ export default function AdminQuotationsPage() {
             customer_phone: customerPhone.trim() || null
           };
 
-      const { data: insertedQuotation, error: insertErr } = await supabase
-        .from('quotations')
-        .insert({
-          ...customerPayload,
-          title: title.trim(),
-          vehicle_info: vehicleInfo.trim() || null,
-          status,
-          valid_until: validUntil || null,
-          subtotal: totals.subtotal,
-          discount_amount: totals.discount,
-          total_amount: totals.total,
-          notes: notes.trim() || null
-        })
-        .select('id')
-        .single();
+      let quotationId = editingQuotation?.id;
 
-      if (insertErr) throw insertErr;
+      if (editingQuotation) {
+        const { error: updateErr } = await supabase
+          .from('quotations')
+          .update({
+            ...customerPayload,
+            title: title.trim(),
+            vehicle_info: vehicleInfo.trim() || null,
+            status,
+            valid_until: validUntil || null,
+            subtotal: totals.subtotal,
+            discount_amount: totals.discount,
+            total_amount: totals.total,
+            notes: notes.trim() || null
+          })
+          .eq('id', editingQuotation.id);
+
+        if (updateErr) throw updateErr;
+
+        const { error: deleteItemsErr } = await supabase
+          .from('quotation_items')
+          .delete()
+          .eq('quotation_id', editingQuotation.id);
+
+        if (deleteItemsErr) throw deleteItemsErr;
+      } else {
+        const { data: insertedQuotation, error: insertErr } = await supabase
+          .from('quotations')
+          .insert({
+            ...customerPayload,
+            title: title.trim(),
+            vehicle_info: vehicleInfo.trim() || null,
+            status,
+            valid_until: validUntil || null,
+            subtotal: totals.subtotal,
+            discount_amount: totals.discount,
+            total_amount: totals.total,
+            notes: notes.trim() || null
+          })
+          .select('id')
+          .single();
+
+        if (insertErr) throw insertErr;
+        quotationId = insertedQuotation.id;
+      }
+
+      if (!quotationId) {
+        throw new Error('Falha ao identificar o orçamento.');
+      }
 
       const { error: itemErr } = await supabase
         .from('quotation_items')
         .insert(cleanItems.map((item) => ({
-          quotation_id: insertedQuotation.id,
+          quotation_id: quotationId,
           ...item
         })));
 
@@ -365,14 +475,38 @@ export default function AdminQuotationsPage() {
 
       await fetchQuotations();
       setIsCreateModalOpen(false);
+      setEditingQuotation(null);
       resetForm();
       setShowSuccessOverlay(true);
       success('Orçamento gerado', 'O orçamento foi salvo no banco de dados.');
       window.setTimeout(() => setShowSuccessOverlay(false), 2200);
-    } catch (err: any) {
-      error('Erro ao gerar orçamento', err.message || 'Não foi possível salvar o orçamento.');
+    } catch (err: unknown) {
+      error('Erro ao gerar orçamento', getErrorMessage(err, 'Não foi possível salvar o orçamento.'));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteQuotation = async () => {
+    if (!quotationToDelete) return;
+    setIsDeleting(true);
+
+    try {
+      const { error: deleteErr } = await supabase
+        .from('quotations')
+        .delete()
+        .eq('id', quotationToDelete.id);
+
+      if (deleteErr) throw deleteErr;
+
+      setQuotations((current) => current.filter((quotation) => quotation.id !== quotationToDelete.id));
+      setQuotationToDelete(null);
+      setShowDeleteSuccessOverlay(true);
+      window.setTimeout(() => setShowDeleteSuccessOverlay(false), 2400);
+    } catch (err: unknown) {
+      error('Erro ao deletar orçamento', getErrorMessage(err, 'Não foi possível deletar o orçamento.'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -401,7 +535,7 @@ export default function AdminQuotationsPage() {
               Gere propostas para clientes cadastrados ou atendimentos avulsos
             </p>
           </div>
-          <Button size="sm" onClick={() => setIsCreateModalOpen(true)} disabled={!canCreate}>
+          <Button size="sm" onClick={openCreateModal} disabled={!canCreate}>
             <Plus className="w-4 h-4" /> Novo Orçamento
           </Button>
         </div>
@@ -460,6 +594,7 @@ export default function AdminQuotationsPage() {
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Validade</TableHead>
+                {canManageQuotations && <TableHead className="text-right">Acoes</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -479,6 +614,28 @@ export default function AdminQuotationsPage() {
                   <TableCell className="font-mono text-xs text-brand-grey">
                     {quotation.valid_until ? new Date(`${quotation.valid_until}T00:00:00`).toLocaleDateString('pt-BR') : '-'}
                   </TableCell>
+                  {canManageQuotations && (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(quotation)}
+                          title="Editar orcamento"
+                          className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-white"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQuotationToDelete(quotation)}
+                          title="Deletar orcamento"
+                          className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-brand-red"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -492,6 +649,7 @@ export default function AdminQuotationsPage() {
             <button
               onClick={() => {
                 setIsCreateModalOpen(false);
+                setEditingQuotation(null);
                 resetForm();
               }}
               className="absolute top-4 right-4 text-brand-grey hover:text-white transition-colors"
@@ -501,14 +659,14 @@ export default function AdminQuotationsPage() {
 
             <div>
               <h3 className="text-lg font-black italic uppercase tracking-tight text-white">
-                Gerar Orçamento
+                {editingQuotation ? 'Editar Orcamento' : 'Gerar Orcamento'}
               </h3>
               <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
                 Monte uma proposta com cliente cadastrado ou atendimento avulso
               </p>
             </div>
 
-            <form onSubmit={handleCreateQuotation} className="space-y-5 text-left">
+            <form onSubmit={handleSaveQuotation} className="space-y-5 text-left">
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -664,6 +822,7 @@ export default function AdminQuotationsPage() {
                   variant="secondary"
                   onClick={() => {
                     setIsCreateModalOpen(false);
+                    setEditingQuotation(null);
                     resetForm();
                     info('Orçamento cancelado', 'Nenhum orçamento foi registrado.');
                   }}
@@ -671,7 +830,7 @@ export default function AdminQuotationsPage() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={isSaving}>
-                  {isSaving ? 'Salvando...' : 'Salvar Orçamento'}
+                  {isSaving ? 'Salvando...' : editingQuotation ? 'Atualizar Orcamento' : 'Salvar Orcamento'}
                 </Button>
               </div>
             </form>
@@ -691,6 +850,50 @@ export default function AdminQuotationsPage() {
             <p className="text-[11px] text-brand-grey leading-normal">
               A proposta foi registrada no banco de dados.
             </p>
+          </div>
+        </div>
+      )}
+
+      {quotationToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs">
+          <Card className="w-full max-w-md mx-4 p-7 space-y-6 text-center" withStripe>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center border border-brand-red/40 bg-brand-red/10 text-brand-red">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-black uppercase tracking-wider text-white leading-tight">
+              TEM CERTEZA QUE DESEJA DELETAR ESTE ORÇAMENTO?
+            </h3>
+            <div className="flex justify-center gap-3 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setQuotationToDelete(null)}
+                disabled={isDeleting}
+              >
+                CANCELAR
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={handleDeleteQuotation}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'DELETANDO...' : 'DELETAR'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {showDeleteSuccessOverlay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
+          <div className="bg-brand-card border border-emerald-500/35 p-8 rounded shadow-2xl flex flex-col items-center gap-4 text-center max-w-sm mx-4 animate-in fade-in zoom-in-95 duration-200" style={{ borderLeft: '4px solid #10b981' }}>
+            <div className="w-12 h-12 bg-emerald-500/20 border border-emerald-500/40 rounded-full flex items-center justify-center text-emerald-500">
+              <Check className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-black tracking-wider uppercase text-emerald-500 leading-tight">
+              ORÇAMENTO DELETADO COM SUCESSO!
+            </h3>
           </div>
         </div>
       )}
