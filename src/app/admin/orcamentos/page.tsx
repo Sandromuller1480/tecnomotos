@@ -110,7 +110,7 @@ const statusVariants: Record<QuotationStatus, 'neutral' | 'info' | 'success' | '
 };
 
 const emptyItem = (): QuotationItemForm => ({
-  item_type: 'SERVICE',
+  item_type: 'PRODUCT',
   product_id: '',
   description: '',
   quantity: '1',
@@ -552,11 +552,11 @@ export default function AdminQuotationsPage() {
   return (
     <div className="space-y-6 text-left">
       <div>
-        <Breadcrumb items={[{ label: 'Comercial' }, { label: 'Orcamentos' }]} />
+        <Breadcrumb items={[{ label: 'Comercial' }, { label: 'Orçamentos' }]} />
         <div className="flex justify-between items-center mt-2 border-b border-brand-grey/15 pb-4">
           <div>
             <h1 className="text-2xl font-black italic uppercase tracking-tight text-white">
-              Orcamentos
+              Orçamentos
             </h1>
             <p className="text-xs text-brand-grey uppercase tracking-widest font-mono mt-1">
               Gere propostas para clientes cadastrados ou atendimentos avulsos
@@ -609,7 +609,7 @@ export default function AdminQuotationsPage() {
           <div className="py-16 text-center text-brand-grey">
             <ClipboardList className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <h3 className="text-sm font-black uppercase tracking-wider text-white">Nenhum orçamento registrado</h3>
-            <p className="text-xs mt-2">Os orcamentos gerados aparecerao estruturados aqui.</p>
+            <p className="text-xs mt-2">Os orçamentos gerados aparecerão estruturados aqui.</p>
           </div>
         ) : (
           <Table>
@@ -621,7 +621,7 @@ export default function AdminQuotationsPage() {
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Validade</TableHead>
-                <TableHead className="text-right">Acoes</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -646,7 +646,7 @@ export default function AdminQuotationsPage() {
                       <button
                         type="button"
                         onClick={() => setViewingQuotation(quotation)}
-                        title="Visualizar orcamento"
+                        title="Visualizar orçamento"
                         className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-white"
                       >
                         <Eye className="h-4 w-4" />
@@ -654,7 +654,7 @@ export default function AdminQuotationsPage() {
                       <button
                         type="button"
                         onClick={() => openQuotationPdf(quotation)}
-                        title="Abrir PDF do orcamento"
+                        title="Abrir PDF do orçamento"
                         className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-white"
                       >
                         <FileText className="h-4 w-4" />
@@ -662,7 +662,7 @@ export default function AdminQuotationsPage() {
                       <button
                         type="button"
                         onClick={() => sendQuotationToWhatsapp(quotation)}
-                        title="Enviar orcamento por WhatsApp"
+                        title="Enviar orçamento por WhatsApp"
                         className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black transition-colors hover:border-[#25D366]"
                       >
                         <Image src={whatsappIcon} alt="" className="h-4 w-4 object-contain" />
@@ -672,7 +672,7 @@ export default function AdminQuotationsPage() {
                         <button
                           type="button"
                           onClick={() => openEditModal(quotation)}
-                          title="Editar orcamento"
+                          title="Editar orçamento"
                           className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-white"
                         >
                           <Pencil className="h-4 w-4" />
@@ -680,7 +680,7 @@ export default function AdminQuotationsPage() {
                         <button
                           type="button"
                           onClick={() => setQuotationToDelete(quotation)}
-                          title="Deletar orcamento"
+                          title="Deletar orçamento"
                           className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-brand-red"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -730,7 +730,7 @@ export default function AdminQuotationsPage() {
                 <p className="mt-1 text-[11px] font-mono text-brand-grey">{viewingQuotation.customer_email || viewingQuotation.customer_phone || '-'}</p>
               </div>
               <div className="border border-brand-grey/15 bg-brand-black/50 p-4">
-                <p className="text-[10px] font-mono uppercase tracking-widest text-brand-grey">Veiculo</p>
+                <p className="text-[10px] font-mono uppercase tracking-widest text-brand-grey">Veículo</p>
                 <p className="mt-2 text-sm font-bold text-white">{viewingQuotation.vehicle_info || '-'}</p>
               </div>
               <div className="border border-brand-grey/15 bg-brand-black/50 p-4">
@@ -745,7 +745,7 @@ export default function AdminQuotationsPage() {
               <div className="grid grid-cols-[1fr_90px_120px_120px] gap-3 border-b border-brand-grey/15 bg-brand-black/60 px-4 py-3 text-[10px] font-mono uppercase tracking-widest text-brand-grey">
                 <span>Item</span>
                 <span className="text-right">Qtd</span>
-                <span className="text-right">Unitario</span>
+                <span className="text-right">Unitário</span>
                 <span className="text-right">Total</span>
               </div>
               {(viewingQuotation.quotation_items || []).length === 0 ? (
@@ -756,7 +756,7 @@ export default function AdminQuotationsPage() {
                     <div key={item.id} className="grid grid-cols-[1fr_90px_120px_120px] gap-3 px-4 py-3 text-xs">
                       <div>
                         <p className="font-bold text-white">{item.description}</p>
-                        <p className="mt-1 text-[10px] font-mono uppercase text-brand-grey">{item.item_type === 'PRODUCT' ? 'Produto' : 'Servico'}</p>
+                        <p className="mt-1 text-[10px] font-mono uppercase text-brand-grey">{item.item_type === 'PRODUCT' ? 'Produto' : 'Serviço'}</p>
                       </div>
                       <span className="text-right font-mono text-brand-silver">{item.quantity}</span>
                       <span className="text-right font-mono text-brand-silver">{money(item.unit_price)}</span>
@@ -769,7 +769,7 @@ export default function AdminQuotationsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-4">
               <div className="border border-brand-grey/15 bg-brand-black/50 p-4">
-                <p className="text-[10px] font-mono uppercase tracking-widest text-brand-grey">Observacoes</p>
+                <p className="text-[10px] font-mono uppercase tracking-widest text-brand-grey">Observações</p>
                 <p className="mt-2 text-xs leading-relaxed text-brand-silver">{viewingQuotation.notes || '-'}</p>
               </div>
               <div className="border border-brand-grey/15 bg-brand-black/60 p-4 space-y-3 font-mono text-xs">
@@ -818,7 +818,7 @@ export default function AdminQuotationsPage() {
             <div className="flex flex-wrap items-start justify-between gap-4 pr-8">
               <div>
                 <h3 className="text-lg font-black italic uppercase tracking-tight text-white">
-                  {editingQuotation ? 'Editar Orcamento' : 'Gerar Orcamento'}
+                  {editingQuotation ? 'Editar Orçamento' : 'Gerar Orçamento'}
                 </h3>
                 <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
                   Monte uma proposta com cliente cadastrado ou atendimento avulso
@@ -892,7 +892,7 @@ export default function AdminQuotationsPage() {
 
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-[10px] font-mono text-brand-grey uppercase">Título do orçamento</label>
-                  <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex: Revisao geral Fazer 250" required />
+                  <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex: Revisão geral Fazer 250" required />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono text-brand-grey uppercase">Motocicleta / Placa</label>
@@ -925,7 +925,7 @@ export default function AdminQuotationsPage() {
                     onChange={(event) => setGeneratePdf(event.target.checked)}
                     className="h-4 w-4 accent-brand-red"
                   />
-                  Gerar PDF do orcamento ao salvar
+                  Gerar PDF do orçamento ao salvar
                 </label>
               </div>
 
@@ -945,8 +945,8 @@ export default function AdminQuotationsPage() {
                         onChange={(event) => updateItem(index, { item_type: event.target.value as QuotationItemType, product_id: '' })}
                         className="text-xs font-mono bg-brand-input border border-brand-grey/25 text-white rounded px-3 py-2 focus:outline-none focus:border-brand-red"
                       >
-                        <option value="SERVICE">Serviço</option>
                         <option value="PRODUCT">Produto</option>
+                        <option value="SERVICE">Serviço</option>
                       </select>
                       {item.item_type === 'PRODUCT' ? (
                         <select
@@ -979,13 +979,13 @@ export default function AdminQuotationsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-brand-grey uppercase">Observacoes</label>
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">Observações</label>
                   <textarea
                     rows={4}
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                     className="w-full text-xs font-mono bg-brand-input border border-brand-grey/25 text-white rounded px-3 py-2 focus:outline-none focus:border-brand-red"
-                    placeholder="Condições, prazo de execucao, garantia ou observacoes internas..."
+                    placeholder="Condições, prazo de execução, garantia ou observações internas..."
                   />
                 </div>
                 <div className="border border-brand-grey/15 bg-brand-black/60 p-4 space-y-3 font-mono text-xs">
@@ -1009,7 +1009,7 @@ export default function AdminQuotationsPage() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={isSaving}>
-                  {isSaving ? 'Salvando...' : editingQuotation ? 'Atualizar Orcamento' : 'Salvar Orcamento'}
+                  {isSaving ? 'Salvando...' : editingQuotation ? 'Atualizar Orçamento' : 'Salvar Orçamento'}
                 </Button>
               </div>
             </form>
@@ -1024,7 +1024,7 @@ export default function AdminQuotationsPage() {
               <Check className="w-6 h-6" />
             </div>
             <h3 className="text-base font-black tracking-wider uppercase text-emerald-500 leading-tight">
-              ORCAMENTO GERADO COM SUCESSO!
+              ORÇAMENTO GERADO COM SUCESSO!
             </h3>
             <p className="text-[11px] text-brand-grey leading-normal">
               A proposta foi registrada no banco de dados.
