@@ -9,16 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { useToast } from '@/components/ui/toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CounterSaleModal } from '@/components/sales/CounterSaleModal';
 import {
-  ShoppingBag,
   Search,
   X,
-  CreditCard,
-  Calendar,
   ClipboardList,
-  Eye
+  Eye,
+  Plus,
+  Store
 } from 'lucide-react';
 
 interface OrderItem {
@@ -41,6 +40,10 @@ interface Order {
   stripe_payment_intent_id: string | null;
   payment_date: string | null;
   created_at: string;
+  sales_channel: 'ONLINE' | 'COUNTER';
+  customer_name: string | null;
+  payment_method: string | null;
+  notes: string | null;
   customer?: {
     full_name: string;
   };
@@ -50,12 +53,12 @@ interface Order {
 export default function AdminOrdersPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { error } = useToast();
-
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [canSell, setCanSell] = useState(false);
+  const [isCounterSaleOpen, setIsCounterSaleOpen] = useState(false);
 
   // Details Modal States
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -75,6 +78,10 @@ export default function AdminOrdersPage() {
           stripe_payment_intent_id,
           payment_date,
           created_at,
+          sales_channel,
+          customer_name,
+          payment_method,
+          notes,
           customer: customer_id (
             id,
             profiles: id (
@@ -95,22 +102,31 @@ export default function AdminOrdersPage() {
 
       if (fetchErr) throw fetchErr;
 
-      const formatted = (data || []).map((o: any) => {
-        const custProfile = o.customer?.profiles;
-        const custName = Array.isArray(custProfile)
-          ? custProfile[0]?.full_name
-          : custProfile?.full_name || 'Visitante / Sem Cadastro';
+      const formatted = (data || []).map((o) => {
+        const customerRelation = Array.isArray(o.customer) ? o.customer[0] : o.customer;
+        const custProfile = customerRelation?.profiles;
+        const custName = custProfile?.[0]?.full_name || 'Visitante / Sem Cadastro';
 
         return {
           ...o,
+          status: o.status as Order['status'],
+          sales_channel: (o.sales_channel || 'ONLINE') as Order['sales_channel'],
           total_amount: parseFloat(o.total_amount) || 0,
-          customer: { full_name: custName }
+          customer: { full_name: o.customer_name || custName },
+          order_items: (o.order_items || []).map((item) => {
+            const product = Array.isArray(item.products) ? item.products[0] : item.products;
+            return {
+              ...item,
+              unit_price: Number(item.unit_price) || 0,
+              products: product ? { name: product.name, sku: product.sku } : undefined
+            };
+          })
         };
       });
 
-      setOrders(formatted as Order[]);
-    } catch (e: any) {
-      console.warn('[Orders] Fetch orders failed: ', e.message);
+      setOrders(formatted);
+    } catch (e: unknown) {
+      console.warn('[Orders] Fetch orders failed: ', e instanceof Error ? e.message : e);
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +150,16 @@ export default function AdminOrdersPage() {
         router.push('/403');
         return;
       }
+
+      const [{ data: hasUpdate }, { data: isOwner }] = await Promise.all([
+        supabase.rpc('has_permission', {
+          user_uuid: user.id,
+          required_permission: 'orders.update'
+        }),
+        supabase.rpc('is_owner', { user_uuid: user.id })
+      ]);
+
+      setCanSell(Boolean(hasUpdate || isOwner));
 
       await fetchOrders();
     }
@@ -172,7 +198,12 @@ export default function AdminOrdersPage() {
               Monitore e processe os pedidos do e-commerce e balcão
             </p>
           </div>
-          <Badge variant="neutral">Controle Comercial</Badge>
+          <div className="flex items-center gap-3">
+            <Badge variant="neutral">Controle Comercial</Badge>
+            <Button size="sm" onClick={() => setIsCounterSaleOpen(true)} disabled={!canSell}>
+              <Plus className="h-4 w-4" /> Nova venda de balcão
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -228,6 +259,7 @@ export default function AdminOrdersPage() {
                 <TableHead>E-mail</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status Pagamento</TableHead>
+                <TableHead>Canal</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -257,6 +289,13 @@ export default function AdminOrdersPage() {
                     )}
                     {o.status === 'expired' && (
                       <Badge variant="neutral" className="text-[9px] bg-brand-grey/10 text-brand-grey border border-brand-grey/20">EXPIRADO</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {o.sales_channel === 'COUNTER' ? (
+                      <Badge variant="info" className="text-[9px]">BALCÃO</Badge>
+                    ) : (
+                      <Badge variant="neutral" className="text-[9px]">ONLINE</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -314,6 +353,17 @@ export default function AdminOrdersPage() {
                   <span className="text-white">
                     {selectedOrder.payment_date ? new Date(selectedOrder.payment_date).toLocaleString('pt-BR') : '-'}
                   </span>
+                </div>
+                <div>
+                  <span className="text-[9px] uppercase block mb-1">Canal:</span>
+                  <span className="flex items-center gap-1.5 text-white">
+                    {selectedOrder.sales_channel === 'COUNTER' && <Store className="h-3.5 w-3.5 text-brand-red" />}
+                    {selectedOrder.sales_channel === 'COUNTER' ? 'Venda de balcão' : 'Loja online'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] uppercase block mb-1">Pagamento:</span>
+                  <span className="text-white">{selectedOrder.payment_method || (selectedOrder.sales_channel === 'ONLINE' ? 'Stripe' : '-')}</span>
                 </div>
               </div>
 
@@ -383,6 +433,12 @@ export default function AdminOrdersPage() {
           </Card>
         </div>
       )}
+
+      <CounterSaleModal
+        open={isCounterSaleOpen}
+        onClose={() => setIsCounterSaleOpen(false)}
+        onCompleted={fetchOrders}
+      />
     </div>
   );
 }

@@ -47,10 +47,13 @@ interface FinancialEntry {
 interface OrderRow {
   id: string;
   customer_email: string;
+  customer_name: string | null;
   status: string;
   total_amount: number | string;
   payment_date: string | null;
   created_at: string;
+  sales_channel: 'ONLINE' | 'COUNTER';
+  payment_method: string | null;
 }
 
 interface ServiceOrderRow {
@@ -107,10 +110,10 @@ export default function AdminFinancialPage() {
         id: `order-${order.id}`,
         type: 'INCOME',
         status: 'PAID',
-        category: 'Venda Online',
-        description: `Pedido #${order.id.slice(0, 8).toUpperCase()} - ${order.customer_email}`,
+        category: order.sales_channel === 'COUNTER' ? 'Venda de Balcão' : 'Venda Online',
+        description: `Pedido #${order.id.slice(0, 8).toUpperCase()} - ${order.customer_name || order.customer_email}`,
         amount: parseFloat(String(order.total_amount)) || 0,
-        payment_method: 'Stripe',
+        payment_method: order.payment_method || (order.sales_channel === 'ONLINE' ? 'Stripe' : null),
         due_date: null,
         paid_at: order.payment_date || order.created_at,
         source: 'ORDER',
@@ -165,7 +168,7 @@ export default function AdminFinancialPage() {
 
       const { data: orders, error: ordersErr } = await supabase
         .from('orders')
-        .select('id, customer_email, status, total_amount, payment_date, created_at')
+        .select('id, customer_email, customer_name, status, total_amount, payment_date, created_at, sales_channel, payment_method')
         .eq('status', 'paid')
         .order('created_at', { ascending: false });
 

@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Check, ClipboardList, Eye, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Check, ClipboardList, Eye, FileText, Pencil, Plus, Search, Trash2, Wrench, X } from 'lucide-react';
 import whatsappIcon from '../../../../inagens/ícone whatsapp.png';
 
 type QuotationStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
@@ -65,6 +65,7 @@ interface Quotation {
   total_amount: number;
   notes: string | null;
   created_at: string;
+  service_order_id?: string | null;
   quotation_items?: QuotationItem[];
 }
 
@@ -79,6 +80,7 @@ interface QuotationRow extends Omit<Quotation, 'subtotal' | 'discount_amount' | 
   discount_amount: number | string | null;
   total_amount: number | string | null;
   quotation_items?: QuotationItemRow[] | null;
+  service_orders?: { id: string }[] | { id: string } | null;
 }
 
 interface CustomerProfileRow {
@@ -175,6 +177,7 @@ export default function AdminQuotationsPage() {
         total_amount,
         notes,
         created_at,
+        service_orders ( id ),
         quotation_items (
           id,
           item_type,
@@ -196,18 +199,24 @@ export default function AdminQuotationsPage() {
       throw fetchErr;
     }
 
-    setQuotations(((data || []) as QuotationRow[]).map((quotation) => ({
-      ...quotation,
-      subtotal: parseFloat(String(quotation.subtotal)) || 0,
-      discount_amount: parseFloat(String(quotation.discount_amount)) || 0,
-      total_amount: parseFloat(String(quotation.total_amount)) || 0,
-      quotation_items: (quotation.quotation_items || []).map((item) => ({
-        ...item,
-        quantity: parseFloat(String(item.quantity)) || 0,
-        unit_price: parseFloat(String(item.unit_price)) || 0,
-        total_price: parseFloat(String(item.total_price)) || 0
-      }))
-    })));
+    setQuotations(((data || []) as QuotationRow[]).map((quotation) => {
+      const relatedOrder = Array.isArray(quotation.service_orders)
+        ? quotation.service_orders[0]
+        : quotation.service_orders;
+      return {
+        ...quotation,
+        service_order_id: relatedOrder?.id || null,
+        subtotal: parseFloat(String(quotation.subtotal)) || 0,
+        discount_amount: parseFloat(String(quotation.discount_amount)) || 0,
+        total_amount: parseFloat(String(quotation.total_amount)) || 0,
+        quotation_items: (quotation.quotation_items || []).map((item) => ({
+          ...item,
+          quantity: parseFloat(String(item.quantity)) || 0,
+          unit_price: parseFloat(String(item.unit_price)) || 0,
+          total_price: parseFloat(String(item.total_price)) || 0
+        }))
+      };
+    }));
   };
 
   const fetchCustomers = async () => {
@@ -667,6 +676,16 @@ export default function AdminQuotationsPage() {
                       >
                         <Image src={whatsappIcon} alt="" className="h-4 w-4 object-contain" />
                       </button>
+                      {quotation.service_order_id && (
+                        <button
+                          type="button"
+                          onClick={() => router.push('/admin/oficina')}
+                          title={`OS #${quotation.service_order_id.slice(0, 8).toUpperCase()} gerada automaticamente`}
+                          className="inline-flex h-9 w-9 items-center justify-center border border-emerald-500/35 bg-emerald-500/10 text-emerald-400 transition-colors hover:border-emerald-400 hover:text-white"
+                        >
+                          <Wrench className="h-4 w-4" />
+                        </button>
+                      )}
                       {canManageQuotations && (
                         <>
                         <button
@@ -780,6 +799,11 @@ export default function AdminQuotationsPage() {
             </div>
 
             <div className="flex flex-wrap justify-end gap-3 border-t border-brand-grey/10 pt-5">
+              {viewingQuotation.service_order_id && (
+                <Button type="button" onClick={() => router.push('/admin/oficina')}>
+                  <Wrench className="w-4 h-4" /> Ver OS #{viewingQuotation.service_order_id.slice(0, 8).toUpperCase()}
+                </Button>
+              )}
               <Button type="button" variant="secondary" onClick={() => openQuotationPdf(viewingQuotation)}>
                 <FileText className="w-4 h-4" /> Abrir PDF
               </Button>
@@ -913,6 +937,11 @@ export default function AdminQuotationsPage() {
                     <option value="SENT">Enviado</option>
                     <option value="APPROVED">Aprovado</option>
                   </select>
+                  {status === 'APPROVED' && (
+                    <p className="text-[10px] font-mono text-emerald-400">
+                      Uma ordem de serviço será criada automaticamente ao salvar.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono text-brand-grey uppercase">Desconto R$</label>
