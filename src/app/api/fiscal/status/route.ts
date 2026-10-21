@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, document });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro ao consultar NFC-e.';
+    const message = error instanceof Error ? error.message : 'Erro ao consultar nota fiscal.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -48,6 +48,22 @@ export interface NfceIssueInput {
   sale: FiscalSale;
 }
 
+export interface FiscalServiceOrder {
+  id: string;
+  customerName: string;
+  customerDocument?: string | null;
+  customerEmail?: string | null;
+  serviceDescription: string;
+  totalAmount: number;
+}
+
+export interface NfseIssueInput {
+  reference: string;
+  environment: FiscalEnvironment;
+  company: FiscalCompanySettings;
+  serviceOrder: FiscalServiceOrder;
+}
+
 export interface ProviderFiscalResult {
   status: FiscalDocumentStatus;
   providerStatus?: string;
@@ -71,5 +87,8 @@ export interface FiscalProvider {
   issueNfce(input: NfceIssueInput): Promise<ProviderFiscalResult>;
   getNfce(reference: string): Promise<ProviderFiscalResult>;
   cancelNfce(reference: string, reason: string): Promise<ProviderFiscalResult>;
+  issueNfse(input: NfseIssueInput): Promise<ProviderFiscalResult>;
+  getNfse(reference: string): Promise<ProviderFiscalResult>;
+  cancelNfse(reference: string, reason: string): Promise<ProviderFiscalResult>;
   getServiceStatus(): Promise<{ status: 'ONLINE' | 'OFFLINE' | 'UNAVAILABLE' | 'UNKNOWN'; environment: FiscalEnvironment; lastCheck: string }>;
 }

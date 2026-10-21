@@ -1,5 +1,5 @@
 import { mapFiscalPaymentMethod } from '../FiscalPaymentMapper';
-import { FiscalEnvironment, FiscalProvider, NfceIssueInput, ProviderFiscalResult } from '../types';
+import { FiscalEnvironment, FiscalProvider, NfceIssueInput, NfseIssueInput, ProviderFiscalResult } from '../types';
 
 const FOCUS_BASE_URLS: Record<Exclude<FiscalEnvironment, 'mock'>, string> = {
   homologation: 'https://homologacao.focusnfe.com.br',
@@ -44,6 +44,18 @@ export class FocusNFeProvider implements FiscalProvider {
     });
 
     return this.mapFocusResponse(response);
+  }
+
+  async issueNfse(_input: NfseIssueInput): Promise<ProviderFiscalResult> {
+    throw new Error('Emissão de NFS-e pela Focus NFe ainda não está habilitada.');
+  }
+
+  async getNfse(_reference: string): Promise<ProviderFiscalResult> {
+    throw new Error('Consulta de NFS-e pela Focus NFe ainda não está habilitada.');
+  }
+
+  async cancelNfse(_reference: string, _reason: string): Promise<ProviderFiscalResult> {
+    throw new Error('Cancelamento de NFS-e pela Focus NFe ainda não está habilitado.');
   }
 
   async getServiceStatus() {

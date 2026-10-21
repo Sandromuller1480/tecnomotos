@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { createFiscalProvider, getFiscalRuntimeConfig } from './FiscalProviderFactory';
 import { validateNfceSale } from './validateNfceSale';
-import { FiscalCompanySettings, FiscalDocumentStatus, FiscalSale, ProviderFiscalResult } from './types';
+import { FiscalCompanySettings, FiscalDocumentStatus, FiscalSale, FiscalServiceOrder, ProviderFiscalResult } from './types';
 
 type DatabaseClient = SupabaseClient<any, 'public', any>;
 
@@ -61,6 +61,45 @@ export class FiscalOperationService {
     }
   }
 
+  async issueNfse(serviceOrderId: string) {
+    const config = getFiscalRuntimeConfig();
+    const existing = await this.getExistingServiceDocument(serviceOrderId);
+
+    if (existing && ['pending', 'processing', 'authorized', 'cancelled', 'EMITTED', 'CANCELLED'].includes(existing.status)) {
+      return { document: existing, reused: true };
+    }
+
+    const serviceOrder = await this.loadServiceOrder(serviceOrderId);
+    const company = await this.loadCompanySettings();
+    const reference = `tecnomotos-nfse-${serviceOrderId}`;
+    const provider = createFiscalProvider();
+
+    try {
+      const result = await provider.issueNfse({
+        reference,
+        environment: config.environment,
+        company,
+        serviceOrder
+      });
+
+      const document = await this.saveServiceDocument(serviceOrderId, reference, result, company, serviceOrder);
+      await this.log(
+        result.status === 'authorized' ? 'fiscal.nfse.issue.success' : 'fiscal.nfse.issue.rejected',
+        document.id,
+        reference,
+        result.status,
+        result.errorMessage || result.providerStatus || 'Resposta da NFS-e processada.',
+        result
+      );
+
+      return { document, reused: false };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao emitir NFS-e.';
+      await this.log('fiscal.nfse.issue.error', null, reference, 'error', message);
+      throw error;
+    }
+  }
+
   async queryDocument(documentId: string) {
     const { data: document, error } = await this.db
       .from('fiscal_documents')
@@ -73,8 +112,11 @@ export class FiscalOperationService {
     }
 
     const provider = createFiscalProvider();
-    await this.log('fiscal.query.start', document.id, document.reference, document.status, 'Consulta NFC-e iniciada.');
-    const result = await provider.getNfce(document.reference);
+    const isNfse = document.document_type === 'NFSE';
+    await this.log('fiscal.query.start', document.id, document.reference, document.status, `Consulta ${isNfse ? 'NFS-e' : 'NFC-e'} iniciada.`);
+    const result = isNfse
+      ? await provider.getNfse(document.reference)
+      : await provider.getNfce(document.reference);
     const updated = await this.applyProviderResult(document.id, result);
 
     if (document.fiscal_operation_id) {
@@ -102,12 +144,15 @@ export class FiscalOperationService {
     }
 
     if (!['authorized', 'EMITTED'].includes(document.status)) {
-      throw new Error('Somente NFC-e autorizada pode ser cancelada.');
+      throw new Error('Somente uma nota autorizada pode ser cancelada.');
     }
 
     const provider = createFiscalProvider();
-    await this.log('fiscal.cancel.start', document.id, document.reference, document.status, 'Cancelamento NFC-e iniciado.');
-    const result = await provider.cancelNfce(document.reference, reason);
+    const isNfse = document.document_type === 'NFSE';
+    await this.log('fiscal.cancel.start', document.id, document.reference, document.status, `Cancelamento ${isNfse ? 'NFS-e' : 'NFC-e'} iniciado.`);
+    const result = isNfse
+      ? await provider.cancelNfse(document.reference, reason)
+      : await provider.cancelNfce(document.reference, reason);
     const updated = await this.applyProviderResult(document.id, result);
 
     if (document.fiscal_operation_id) {
@@ -240,11 +285,63 @@ export class FiscalOperationService {
     };
   }
 
+  private async loadServiceOrder(serviceOrderId: string): Promise<FiscalServiceOrder> {
+    const { data: serviceOrder, error } = await this.db
+      .from('service_orders')
+      .select(`
+        id,
+        service_type,
+        description,
+        status,
+        total_price,
+        customer:customers!service_orders_customer_id_fkey (
+          document,
+          profiles!customers_id_fkey (
+            full_name,
+            email
+          )
+        )
+      `)
+      .eq('id', serviceOrderId)
+      .single();
+
+    if (error || !serviceOrder) throw new Error('Ordem de serviço não encontrada para emissão fiscal.');
+    if (serviceOrder.status !== 'COMPLETED') throw new Error('A NFS-e só pode ser emitida para uma ordem de serviço concluída.');
+
+    const customer = Array.isArray(serviceOrder.customer) ? serviceOrder.customer[0] : serviceOrder.customer;
+    const profile = Array.isArray(customer?.profiles) ? customer.profiles[0] : customer?.profiles;
+    const totalAmount = Number(serviceOrder.total_price) || 0;
+
+    if (totalAmount <= 0) throw new Error('A ordem de serviço precisa ter valor de mão de obra maior que zero.');
+
+    return {
+      id: serviceOrder.id,
+      customerName: profile?.full_name || 'Consumidor não identificado',
+      customerDocument: customer?.document || null,
+      customerEmail: profile?.email || null,
+      serviceDescription: serviceOrder.description || serviceOrder.service_type,
+      totalAmount
+    };
+  }
+
   private async getExistingDocument(orderId: string) {
     const { data } = await this.db
       .from('fiscal_documents')
       .select('*')
       .or(`sale_id.eq.${orderId},order_id.eq.${orderId}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return data;
+  }
+
+  private async getExistingServiceDocument(serviceOrderId: string) {
+    const { data } = await this.db
+      .from('fiscal_documents')
+      .select('*')
+      .eq('document_type', 'NFSE')
+      .eq('order_id', serviceOrderId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -326,6 +423,50 @@ export class FiscalOperationService {
       issuer_cnpj: digitsOnly(company.cnpj),
       recipient_cpf_cnpj: digitsOnly(sale.customerDocument),
       total_amount: sale.totalAmount,
+      issued_at: new Date().toISOString(),
+      authorized_at: result.authorizedAt,
+      cancelled_at: result.cancelledAt
+    };
+
+    const { data, error } = await this.db
+      .from('fiscal_documents')
+      .upsert(payload, { onConflict: 'reference' })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  private async saveServiceDocument(
+    serviceOrderId: string,
+    reference: string,
+    result: ProviderFiscalResult,
+    company: FiscalCompanySettings,
+    serviceOrder: FiscalServiceOrder
+  ) {
+    const payload = {
+      order_id: serviceOrderId,
+      sale_id: null,
+      provider: getFiscalRuntimeConfig().provider,
+      document_type: 'NFSE',
+      model: 'NFS-e',
+      environment: getFiscalRuntimeConfig().environment,
+      reference,
+      status: result.status,
+      invoice_number: result.number,
+      series: result.series,
+      access_key: result.accessKey,
+      protocol: result.protocol,
+      xml_url: result.xmlUrl,
+      danfe_url: result.danfceUrl,
+      provider_document_id: result.providerDocumentId,
+      provider_status: result.providerStatus,
+      error_code: result.errorCode,
+      error_message: result.errorMessage,
+      issuer_cnpj: digitsOnly(company.cnpj),
+      recipient_cpf_cnpj: digitsOnly(serviceOrder.customerDocument),
+      total_amount: serviceOrder.totalAmount,
       issued_at: new Date().toISOString(),
       authorized_at: result.authorizedAt,
       cancelled_at: result.cancelledAt

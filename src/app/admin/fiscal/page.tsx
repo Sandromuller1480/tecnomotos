@@ -11,6 +11,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { EmptyState } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FiscalTypeNav } from '@/components/fiscal/FiscalTypeNav';
 import { FileText, Plus, CheckCircle, RefreshCw, AlertCircle, XCircle } from 'lucide-react';
 
 interface FiscalDocument {
@@ -26,6 +27,7 @@ interface FiscalDocument {
   access_key?: string;
   protocol?: string;
   created_at: string;
+  document_type?: 'NFCE' | 'NFE' | 'NFSE';
 }
 
 interface PendingFiscalOrder {
@@ -86,6 +88,7 @@ export default function AdminFiscalPage() {
     const { data: docs, error: fetchErr } = await supabase
       .from('fiscal_documents')
       .select('*')
+      .eq('document_type', 'NFCE')
       .order('created_at', { ascending: false });
 
     if (fetchErr) throw fetchErr;
@@ -245,9 +248,11 @@ export default function AdminFiscalPage() {
               Monitore documentos fiscais e emita notas a partir de pedidos pagos reais
             </p>
           </div>
-          <Badge variant="neutral">Dados Reais</Badge>
+          <Badge variant="neutral">Modo Mock</Badge>
         </div>
       </div>
+
+      <FiscalTypeNav />
 
       <div className="space-y-4">
         <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-grey border-b border-brand-grey/15 pb-2">

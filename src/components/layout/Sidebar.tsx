@@ -34,6 +34,7 @@ interface MenuItem {
   icon: React.ComponentType<{ className?: string }>;
   permission?: string;
   activePath?: string;
+  exact?: boolean;
 }
 
 interface MenuGroup {
@@ -110,7 +111,8 @@ export function Sidebar({ userRole = 'CUSTOMER', userPermissions = [], employeeF
     {
       title: 'Fiscal',
       items: [
-        { label: 'NFC-e', href: '/admin/fiscal', icon: Receipt, permission: 'fiscal.view' },
+        { label: 'Venda de Produtos', href: '/admin/fiscal', icon: Receipt, permission: 'fiscal.view', exact: true },
+        { label: 'Prestação de Serviços', href: '/admin/fiscal/servicos', icon: FileText, permission: 'fiscal.view' },
       ],
     },
     {
@@ -173,7 +175,9 @@ export function Sidebar({ userRole = 'CUSTOMER', userPermissions = [], employeeF
                   {permittedItems.map((item, itemIdx) => {
                     const Icon = item.icon;
                     const activePath = item.activePath ?? item.href;
-                    const isActive = pathname === activePath || (activePath !== '/admin/dashboard' && pathname.startsWith(activePath));
+                    const isActive = item.exact
+                      ? pathname === activePath
+                      : pathname === activePath || (activePath !== '/admin/dashboard' && pathname.startsWith(activePath));
 
                     return (
                       <li key={itemIdx}>
