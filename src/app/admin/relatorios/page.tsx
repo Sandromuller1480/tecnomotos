@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { ReportDetailModal } from '@/components/reports/ReportDetailModal';
 import {
   Activity,
   ArrowDownCircle,
@@ -18,6 +19,7 @@ import {
   ClipboardList,
   Download,
   FileText,
+  Eye,
   Package,
   RefreshCw,
   Search,
@@ -176,6 +178,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
     return toDateInput(date);
   });
   const [endDate, setEndDate] = useState(today);
+  const [selectedDetail, setSelectedDetail] = useState<{ kind: 'sale' | 'service'; id: string } | null>(null);
 
   const inRange = (createdAt: string) => {
     const date = createdAt.slice(0, 10);
@@ -455,6 +458,39 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
     success('Relatório exportado', 'O arquivo CSV foi gerado.');
   };
 
+  const downloadDetailPdf = (kind: 'sale' | 'service', id: string) => {
+    const resource = kind === 'sale' ? 'vendas' : 'servicos';
+    const link = document.createElement('a');
+    link.href = `/api/relatorios/${resource}/${id}?format=pdf`;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const detailActions = (kind: 'sale' | 'service', id: string) => (
+    <div className="flex items-center justify-end gap-2">
+      <button
+        type="button"
+        onClick={() => setSelectedDetail({ kind, id })}
+        title={kind === 'sale' ? 'Visualizar venda completa' : 'Visualizar serviço completo'}
+        aria-label={kind === 'sale' ? 'Visualizar venda completa' : 'Visualizar serviço completo'}
+        className="flex h-8 w-8 items-center justify-center border border-brand-grey/25 text-brand-grey transition-colors hover:border-brand-red hover:text-white"
+      >
+        <Eye className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => downloadDetailPdf(kind, id)}
+        title="Baixar PDF completo"
+        aria-label="Baixar PDF completo"
+        className="flex h-8 w-8 items-center justify-center border border-brand-grey/25 text-brand-grey transition-colors hover:border-brand-red hover:text-brand-red"
+      >
+        <Download className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
   const metricCards = [
     { label: 'Receita Comercial', value: money(metrics.salesRevenue), detail: `${metrics.paidOrders} pedidos pagos`, icon: ShoppingBag, tone: 'text-emerald-400' },
     { label: 'Receita Oficina', value: money(metrics.workshopRevenue), detail: `${metrics.serviceOpen} OS em aberto`, icon: Wrench, tone: 'text-sky-400' },
@@ -594,7 +630,8 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
                       cliente: order.customer_email,
                       status: order.status,
                       valor: money(asNumber(order.total_amount)),
-                      data: new Date(order.created_at).toLocaleDateString('pt-BR')
+                      data: new Date(order.created_at).toLocaleDateString('pt-BR'),
+                      ações: detailActions('sale', order.id)
                     })),
                     ...scoped.quotations.map((quotation) => ({
                       código: `Orçamento ${quotation.id.slice(0, 8).toUpperCase()}`,
@@ -617,7 +654,8 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
                     serviço: order.service_type,
                     status: order.status,
                     valor: money(asNumber(order.total_price)),
-                    data: new Date(order.created_at).toLocaleDateString('pt-BR')
+                    data: new Date(order.created_at).toLocaleDateString('pt-BR'),
+                    ações: detailActions('service', order.id)
                   }))}
                 />
               </ReportPanel>
@@ -679,6 +717,14 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
           </div>
         )}
       </Card>
+
+      {selectedDetail && (
+        <ReportDetailModal
+          kind={selectedDetail.kind}
+          id={selectedDetail.id}
+          onClose={() => setSelectedDetail(null)}
+        />
+      )}
     </div>
   );
 }
@@ -729,7 +775,7 @@ function SummaryBox({ label, value, tone }: { label: string; value: string; tone
   );
 }
 
-function DataTable({ rows, empty }: { rows: Array<Record<string, unknown>>; empty: string }) {
+function DataTable({ rows, empty }: { rows: Array<Record<string, React.ReactNode>>; empty: string }) {
   if (rows.length === 0) {
     return <div className="py-10 text-center text-brand-grey font-mono text-xs">{empty}</div>;
   }
@@ -751,7 +797,7 @@ function DataTable({ rows, empty }: { rows: Array<Record<string, unknown>>; empt
             <tr key={rowIndex} className="border-b border-brand-grey/10 hover:bg-white/2 transition-colors">
               {headers.map((header) => (
                 <td key={header} className="py-3.5 px-4 align-middle font-mono text-xs">
-                  {String(row[header] ?? '-')}
+                  {row[header] ?? '-'}
                 </td>
               ))}
             </tr>

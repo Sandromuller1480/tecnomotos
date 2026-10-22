@@ -1,0 +1,92 @@
+%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >> endobj
+4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj
+5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >> endobj
+6 0 obj << /Length 4502 >> stream
+0.04 0.04 0.04 rg 0.00 769.89 595.28 72.00 re f
+0.88 0.02 0.02 rg 0.00 765.89 595.28 4.00 re f
+1 1 1 rg BT /F2 18 Tf 42.00 810.89 Td (TECNOMOTOS) Tj ET
+0.95 0.95 0.95 rg BT /F2 10 Tf 42.00 790.89 Td (COMPROVANTE DETALHADO DE VENDA) Tj ET
+0.92 0.08 0.08 rg BT /F2 9 Tf 411.28 799.89 Td (VENDA #7732F1AB) Tj ET
+0.95 0.95 0.95 rg 42.00 715.89 511.28 22.00 re f
+0.88 0.02 0.02 rg 42.00 715.89 4.00 22.00 re f
+0.12 0.12 0.12 rg BT /F2 10 Tf 54.00 722.89 Td (INFORMAÇÕES DA VENDA) Tj ET
+0.42 0.42 0.42 rg BT /F2 7 Tf 42.00 700.89 Td (CÓDIGO) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 42.00 687.89 Td (7732f1ab-1234-5678-9012-123456789012) Tj ET
+0.42 0.42 0.42 rg BT /F2 7 Tf 297.64 700.89 Td (STATUS) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 297.64 687.89 Td (paid) Tj ET
+0.9 0.9 0.9 RG 0.4 w 42.00 670.89 m 553.28 670.89 l S
+0.42 0.42 0.42 rg BT /F2 7 Tf 42.00 662.89 Td (CANAL) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 42.00 649.89 Td (COUNTER) Tj ET
+0.42 0.42 0.42 rg BT /F2 7 Tf 297.64 662.89 Td (PAGAMENTO) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 297.64 649.89 Td (PIX) Tj ET
+0.9 0.9 0.9 RG 0.4 w 42.00 632.89 m 553.28 632.89 l S
+0.42 0.42 0.42 rg BT /F2 7 Tf 42.00 624.89 Td (CRIADA EM) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 42.00 611.89 Td (22/10/2026, 10:28:00) Tj ET
+0.42 0.42 0.42 rg BT /F2 7 Tf 297.64 624.89 Td (PAGAMENTO EM) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 297.64 611.89 Td (22/10/2026, 10:30:00) Tj ET
+0.9 0.9 0.9 RG 0.4 w 42.00 594.89 m 553.28 594.89 l S
+0.95 0.95 0.95 rg 42.00 564.89 511.28 22.00 re f
+0.88 0.02 0.02 rg 42.00 564.89 4.00 22.00 re f
+0.12 0.12 0.12 rg BT /F2 10 Tf 54.00 571.89 Td (CLIENTE) Tj ET
+0.42 0.42 0.42 rg BT /F2 7 Tf 42.00 549.89 Td (NOME) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 42.00 536.89 Td (João da Silva) Tj ET
+0.42 0.42 0.42 rg BT /F2 7 Tf 297.64 549.89 Td (DOCUMENTO) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 297.64 536.89 Td (123.456.789-00) Tj ET
+0.9 0.9 0.9 RG 0.4 w 42.00 519.89 m 553.28 519.89 l S
+0.42 0.42 0.42 rg BT /F2 7 Tf 42.00 511.89 Td (E-MAIL) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 42.00 498.89 Td (joao@example.com) Tj ET
+0.42 0.42 0.42 rg BT /F2 7 Tf 297.64 511.89 Td (TELEFONE) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 297.64 498.89 Td (\(65\) 99999-9999) Tj ET
+0.9 0.9 0.9 RG 0.4 w 42.00 481.89 m 553.28 481.89 l S
+0.42 0.42 0.42 rg BT /F2 7 Tf 42.00 473.89 Td (ENDEREÇO) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 42.00 460.89 Td (Av. Brasil, 123 - Centro, Tangará da) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 42.00 449.89 Td (Serra/MT - 78300-000) Tj ET
+0.9 0.9 0.9 RG 0.4 w 42.00 443.89 m 553.28 443.89 l S
+0.95 0.95 0.95 rg 42.00 413.89 511.28 22.00 re f
+0.88 0.02 0.02 rg 42.00 413.89 4.00 22.00 re f
+0.12 0.12 0.12 rg BT /F2 10 Tf 54.00 420.89 Td (ITENS DA VENDA) Tj ET
+0.12 0.12 0.12 rg 42.00 379.89 511.28 25.00 re f
+1 1 1 rg BT /F2 7 Tf 48.00 387.89 Td (SKU) Tj ET
+1 1 1 rg BT /F2 7 Tf 120.00 387.89 Td (PRODUTO) Tj ET
+1 1 1 rg BT /F2 7 Tf 340.00 387.89 Td (QTD.) Tj ET
+1 1 1 rg BT /F2 7 Tf 388.00 387.89 Td (UNITÁRIO) Tj ET
+1 1 1 rg BT /F2 7 Tf 470.00 387.89 Td (TOTAL) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 48.00 357.89 Td (TM-001) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 120.00 357.89 Td (Kit relação completo para motocicleta) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 120.00 347.89 Td (Honda CB 300) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 340.00 357.89 Td (1) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 388.00 357.89 Td (R$ 350,00) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 470.00 357.89 Td (R$ 350,00) Tj ET
+0.86 0.86 0.86 RG 0.4 w 42.00 341.89 m 553.28 341.89 l S
+0.12 0.12 0.12 rg BT /F1 8 Tf 48.00 325.89 Td (TM-002) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 120.00 325.89 Td (Óleo lubrificante sintético 10W40) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 340.00 325.89 Td (2) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 388.00 325.89 Td (R$ 77,50) Tj ET
+0.12 0.12 0.12 rg BT /F1 8 Tf 470.00 325.89 Td (R$ 155,00) Tj ET
+0.86 0.86 0.86 RG 0.4 w 42.00 313.89 m 553.28 313.89 l S
+0.95 0.95 0.95 rg 333.28 281.89 220.00 30.00 re f
+0.35 0.35 0.35 rg BT /F2 8 Tf 345.28 291.89 Td (VALOR TOTAL) Tj ET
+0.82 0.02 0.02 rg BT /F2 11 Tf 463.28 291.89 Td (R$ 505,00) Tj ET
+0.95 0.95 0.95 rg 42.00 239.89 511.28 22.00 re f
+0.88 0.02 0.02 rg 42.00 239.89 4.00 22.00 re f
+0.12 0.12 0.12 rg BT /F2 10 Tf 54.00 246.89 Td (OBSERVAÇÕES) Tj ET
+0.12 0.12 0.12 rg BT /F1 9 Tf 42.00 224.89 Td (Cliente retirou os produtos no balcão. Pagamento confirmado integralmente.) Tj ET
+0.45 0.45 0.45 rg BT /F1 7 Tf 42 28 Td (TECNOMOTOS - Documento gerado em 22/10/2026, 19:09:17) Tj ET
+0.45 0.45 0.45 rg BT /F2 7 Tf 483.28 28 Td (Pagina 1 de 1) Tj ET
+endstream endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000257 00000 n 
+0000000354 00000 n 
+0000000456 00000 n 
+trailer << /Size 7 /Root 1 0 R >>
+startxref
+5010
+%%EOF
