@@ -10,13 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CounterSaleModal } from '@/components/sales/CounterSaleModal';
 import {
   Search,
   X,
   ClipboardList,
   Eye,
-  Plus,
   Store
 } from 'lucide-react';
 
@@ -57,8 +55,6 @@ export default function AdminOrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [canSell, setCanSell] = useState(false);
-  const [isCounterSaleOpen, setIsCounterSaleOpen] = useState(false);
 
   // Details Modal States
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -151,16 +147,6 @@ export default function AdminOrdersPage() {
         return;
       }
 
-      const [{ data: hasUpdate }, { data: isOwner }] = await Promise.all([
-        supabase.rpc('has_permission', {
-          user_uuid: user.id,
-          required_permission: 'orders.update'
-        }),
-        supabase.rpc('is_owner', { user_uuid: user.id })
-      ]);
-
-      setCanSell(Boolean(hasUpdate || isOwner));
-
       await fetchOrders();
     }
 
@@ -200,9 +186,6 @@ export default function AdminOrdersPage() {
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="neutral">Controle Comercial</Badge>
-            <Button size="sm" onClick={() => setIsCounterSaleOpen(true)} disabled={!canSell}>
-              <Plus className="h-4 w-4" /> Nova venda de balcão
-            </Button>
           </div>
         </div>
       </div>
@@ -434,11 +417,6 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      <CounterSaleModal
-        open={isCounterSaleOpen}
-        onClose={() => setIsCounterSaleOpen(false)}
-        onCompleted={fetchOrders}
-      />
     </div>
   );
 }

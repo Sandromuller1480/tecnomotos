@@ -12,6 +12,7 @@ interface CounterSaleModalProps {
   open: boolean;
   onClose: () => void;
   onCompleted: () => Promise<void> | void;
+  variant?: 'modal' | 'page';
 }
 
 interface ProductOption {
@@ -41,7 +42,7 @@ interface CustomerRow {
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function CounterSaleModal({ open, onClose, onCompleted }: CounterSaleModalProps) {
+export function CounterSaleModal({ open, onClose, onCompleted, variant = 'modal' }: CounterSaleModalProps) {
   const supabase = useMemo(() => createClient(), []);
   const { success, error } = useToast();
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -190,12 +191,13 @@ export function CounterSaleModal({ open, onClose, onCompleted }: CounterSaleModa
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-xs">
-      <Card className="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto p-6" withStripe>
-        <button type="button" onClick={close} className="absolute right-4 top-4 text-brand-grey transition-colors hover:text-white">
-          <X className="h-5 w-5" />
-        </button>
+  const salePanel = (
+      <Card className={variant === 'modal' ? 'relative max-h-[92vh] w-full max-w-5xl overflow-y-auto p-6' : 'relative w-full p-6'} withStripe>
+        {variant === 'modal' && (
+          <button type="button" onClick={close} className="absolute right-4 top-4 text-brand-grey transition-colors hover:text-white" aria-label="Fechar venda de balcão">
+            <X className="h-5 w-5" />
+          </button>
+        )}
 
         {completedOrderId ? (
           <div className="flex min-h-72 flex-col items-center justify-center gap-5 text-center">
@@ -208,7 +210,9 @@ export function CounterSaleModal({ open, onClose, onCompleted }: CounterSaleModa
                 Pedido #{completedOrderId.slice(0, 8).toUpperCase()} registrado como pago
               </p>
             </div>
-            <Button type="button" onClick={close}>Concluir atendimento</Button>
+            <Button type="button" onClick={close}>
+              {variant === 'page' ? 'Iniciar nova venda' : 'Concluir atendimento'}
+            </Button>
           </div>
         ) : (
           <form onSubmit={finalizeSale} className="space-y-6">
@@ -315,7 +319,7 @@ export function CounterSaleModal({ open, onClose, onCompleted }: CounterSaleModa
                 <p className="text-2xl font-black italic text-white">{money(total)}</p>
               </div>
               <div className="flex justify-end gap-3">
-                <Button type="button" variant="secondary" onClick={close}>Cancelar</Button>
+                <Button type="button" variant="secondary" onClick={close}>Limpar venda</Button>
                 <Button type="submit" disabled={isSaving || items.length === 0}>
                   {isSaving ? 'Finalizando...' : 'Finalizar venda'}
                 </Button>
@@ -324,6 +328,13 @@ export function CounterSaleModal({ open, onClose, onCompleted }: CounterSaleModa
           </form>
         )}
       </Card>
+  );
+
+  if (variant === 'page') return salePanel;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-xs">
+      {salePanel}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ClipboardList,
   LayoutDashboard,
+  ShoppingCart,
   ShoppingBag,
   Tag,
   Package,
@@ -77,6 +78,7 @@ export function Sidebar({ userRole = 'CUSTOMER', userPermissions = [], employeeF
     {
       title: 'Comercial',
       items: [
+        { label: 'Vendas', href: '/admin/vendas', icon: ShoppingCart, permission: 'orders.update' },
         { label: 'Pedidos', href: '/admin/pedidos', icon: ShoppingBag, permission: 'orders.view' },
         { label: 'Orçamentos', href: '/admin/orcamentos?novo=1', activePath: '/admin/orcamentos', icon: ClipboardList, permission: 'orders.view' },
         { label: 'Descontos', href: '/admin/descontos', icon: Tag, permission: 'discounts.view' },
