@@ -16,7 +16,6 @@ import {
   Users,
   Wrench,
   DollarSign,
-  Receipt,
   FileText,
   Settings,
   Briefcase,
@@ -51,7 +50,6 @@ export function Sidebar({ userRole = 'CUSTOMER', userPermissions = [], employeeF
     Clientes: true,
     Oficina: true,
     Financeiro: true,
-    Fiscal: true,
     Equipe: true,
   });
   const isOwner = userRole === 'OWNER';
@@ -108,13 +106,6 @@ export function Sidebar({ userRole = 'CUSTOMER', userPermissions = [], employeeF
       title: 'Financeiro',
       items: [
         { label: 'Fluxo de Caixa', href: '/admin/financeiro', icon: DollarSign, permission: 'financial.view' },
-      ],
-    },
-    {
-      title: 'Fiscal',
-      items: [
-        { label: 'Venda de Produtos', href: '/admin/fiscal', icon: Receipt, permission: 'fiscal.view', exact: true },
-        { label: 'Prestação de Serviços', href: '/admin/fiscal/servicos', icon: FileText, permission: 'fiscal.view' },
       ],
     },
     {

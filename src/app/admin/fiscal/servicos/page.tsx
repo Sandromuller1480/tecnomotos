@@ -62,7 +62,7 @@ const customerProfile = (serviceOrder: ServiceOrder) => {
   return Array.isArray(customer?.profiles) ? customer.profiles[0] : customer?.profiles;
 };
 
-export default function FiscalServicesPage() {
+export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const supabase = createClient();
   const { success, error, info } = useToast();
@@ -201,20 +201,34 @@ export default function FiscalServicesPage() {
 
   return (
     <div className="space-y-6 text-left">
-      <div>
-        <Breadcrumb items={[{ label: 'Fiscal' }, { label: 'Prestação de serviços' }]} />
-        <div className="mt-2 flex items-center justify-between border-b border-brand-grey/15 pb-4">
+      {!embedded && (
+        <>
           <div>
-            <h1 className="text-2xl font-black italic uppercase tracking-tight text-white">Emissão Fiscal NFS-e</h1>
-            <p className="mt-1 text-xs font-mono uppercase tracking-widest text-brand-grey">
-              Emita notas de prestação de serviço a partir de ordens concluídas
-            </p>
+            <Breadcrumb items={[{ label: 'Fiscal' }, { label: 'Prestação de serviços' }]} />
+            <div className="mt-2 flex items-center justify-between border-b border-brand-grey/15 pb-4">
+              <div>
+                <h1 className="text-2xl font-black italic uppercase tracking-tight text-white">Emissão Fiscal NFS-e</h1>
+                <p className="mt-1 text-xs font-mono uppercase tracking-widest text-brand-grey">
+                  Emita notas de prestação de serviço a partir de ordens concluídas
+                </p>
+              </div>
+              <Badge variant="neutral">Modo Mock</Badge>
+            </div>
           </div>
-          <Badge variant="neutral">Modo Mock</Badge>
-        </div>
-      </div>
 
-      <FiscalTypeNav />
+          <FiscalTypeNav />
+        </>
+      )}
+
+      {embedded && (
+        <div className="flex flex-col gap-3 border-b border-brand-grey/15 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-black uppercase italic text-white">Notas de serviços</h2>
+            <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-brand-grey">Emissão e acompanhamento de NFS-e para ordens concluídas</p>
+          </div>
+          <Badge variant="neutral">NFS-e</Badge>
+        </div>
+      )}
 
       <div className="space-y-4">
         <h2 className="border-b border-brand-grey/15 pb-2 text-xs font-bold uppercase tracking-widest text-brand-grey font-mono">
@@ -316,4 +330,8 @@ export default function FiscalServicesPage() {
       </div>
     </div>
   );
+}
+
+export default function FiscalServicesPage() {
+  return <FiscalServicesPanel />;
 }

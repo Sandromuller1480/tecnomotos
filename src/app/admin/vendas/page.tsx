@@ -2,10 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart } from 'lucide-react';
-import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { CounterSaleModal } from '@/components/sales/CounterSaleModal';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { createClient } from '@/lib/supabase/client';
 
@@ -45,22 +42,7 @@ export default function AdminSalesPage() {
   }, [router, supabase]);
 
   return (
-    <div className="space-y-6 text-left">
-      <div>
-        <Breadcrumb items={[{ label: 'Comercial' }, { label: 'Vendas' }]} />
-        <div className="flex flex-col gap-4 border-b border-brand-grey/15 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="flex items-center gap-3 text-2xl font-black italic uppercase tracking-tight text-white">
-              <ShoppingCart className="h-6 w-6 text-brand-red" /> Venda de balcão
-            </h1>
-            <p className="mt-1 text-xs font-mono uppercase tracking-widest text-brand-grey">
-              Registre vendas presenciais com baixa automática no estoque
-            </p>
-          </div>
-          <Badge variant="danger">Ponto de venda</Badge>
-        </div>
-      </div>
-
+    <div>
       {isCheckingAccess || !isAuthorized ? (
         <div className="space-y-4 border border-brand-grey/15 bg-brand-card p-6">
           <Skeleton className="h-8 w-64" />

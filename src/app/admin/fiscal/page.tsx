@@ -74,7 +74,7 @@ const fiscalStatusLabels: Record<string, string> = {
   ERROR: 'Erro'
 };
 
-export default function AdminFiscalPage() {
+export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const supabase = createClient();
   const { success, error, info } = useToast();
@@ -237,22 +237,36 @@ export default function AdminFiscalPage() {
 
   return (
     <div className="space-y-6 text-left">
-      <div>
-        <Breadcrumb items={[{ label: 'Fiscal' }, { label: 'NFC-e' }]} />
-        <div className="flex justify-between items-center mt-2 border-b border-brand-grey/15 pb-4">
+      {!embedded && (
+        <>
           <div>
-            <h1 className="text-2xl font-black italic uppercase tracking-tight text-white">
-              Emissão Fiscal NFC-e
-            </h1>
-            <p className="text-xs text-brand-grey uppercase tracking-widest font-mono mt-1">
-              Monitore documentos fiscais e emita notas a partir de pedidos pagos reais
-            </p>
+            <Breadcrumb items={[{ label: 'Fiscal' }, { label: 'NFC-e' }]} />
+            <div className="flex justify-between items-center mt-2 border-b border-brand-grey/15 pb-4">
+              <div>
+                <h1 className="text-2xl font-black italic uppercase tracking-tight text-white">
+                  Emissão Fiscal NFC-e
+                </h1>
+                <p className="text-xs text-brand-grey uppercase tracking-widest font-mono mt-1">
+                  Monitore documentos fiscais e emita notas a partir de pedidos pagos reais
+                </p>
+              </div>
+              <Badge variant="neutral">Modo Mock</Badge>
+            </div>
           </div>
-          <Badge variant="neutral">Modo Mock</Badge>
-        </div>
-      </div>
 
-      <FiscalTypeNav />
+          <FiscalTypeNav />
+        </>
+      )}
+
+      {embedded && (
+        <div className="flex flex-col gap-3 border-b border-brand-grey/15 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-black uppercase italic text-white">Notas de peças e produtos</h2>
+            <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-brand-grey">Emissão e acompanhamento de NFC-e para pedidos pagos</p>
+          </div>
+          <Badge variant="neutral">NFC-e</Badge>
+        </div>
+      )}
 
       <div className="space-y-4">
         <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-grey border-b border-brand-grey/15 pb-2">
@@ -396,4 +410,8 @@ export default function AdminFiscalPage() {
       </div>
     </div>
   );
+}
+
+export default function AdminFiscalPage() {
+  return <FiscalProductsPanel />;
 }

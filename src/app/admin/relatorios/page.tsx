@@ -147,7 +147,12 @@ function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {
   URL.revokeObjectURL(url);
 }
 
-export default function AdminReportsPage() {
+interface AdminReportsPageProps {
+  embedded?: boolean;
+  salesOnly?: boolean;
+}
+
+export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminReportsPageProps) {
   const router = useRouter();
   const supabase = createClient();
   const { success, error, info } = useToast();
@@ -163,7 +168,7 @@ export default function AdminReportsPage() {
     employeeCount: 0
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<ReportTab>('overview');
+  const [activeTab, setActiveTab] = useState<ReportTab>(salesOnly ? 'sales' : 'overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
@@ -197,11 +202,28 @@ export default function AdminReportsPage() {
 
       const { data: hasView } = await supabase.rpc('has_permission', {
         user_uuid: user.id,
-        required_permission: 'reports.view'
+        required_permission: salesOnly ? 'orders.view' : 'reports.view'
       });
 
       if (!hasView) {
         router.push('/403');
+        return;
+      }
+
+      if (salesOnly) {
+        const [ordersRes, serviceOrdersRes] = await Promise.all([
+          supabase.from('orders').select('id, customer_email, status, total_amount, payment_date, created_at').order('created_at', { ascending: false }),
+          supabase.from('service_orders').select('id, service_type, status, total_price, created_at').order('created_at', { ascending: false })
+        ]);
+
+        if (ordersRes.error) throw ordersRes.error;
+        if (serviceOrdersRes.error) throw serviceOrdersRes.error;
+
+        setData((current) => ({
+          ...current,
+          orders: ordersRes.data || [],
+          serviceOrders: serviceOrdersRes.data || []
+        }));
         return;
       }
 
@@ -343,6 +365,29 @@ export default function AdminReportsPage() {
   }, [scoped, data.products]);
 
   const exportCurrent = () => {
+    if (salesOnly) {
+      downloadCsv(`relatorio-vendas-${today}.csv`, [
+        ...scoped.orders.map((order) => ({
+          tipo: 'Venda de peças e produtos',
+          id: order.id,
+          descricao: order.customer_email,
+          status: order.status,
+          total: asNumber(order.total_amount),
+          data: order.created_at
+        })),
+        ...scoped.serviceOrders.map((order) => ({
+          tipo: 'Venda de serviços',
+          id: order.id,
+          descricao: order.service_type,
+          status: order.status,
+          total: asNumber(order.total_price),
+          data: order.created_at
+        }))
+      ]);
+      success('Relatório exportado', 'O arquivo CSV de vendas foi gerado.');
+      return;
+    }
+
     if (activeTab === 'overview') {
       downloadCsv(`relatorio-geral-${today}.csv`, [
         { indicador: 'Receita de vendas', valor: metrics.salesRevenue },
@@ -421,16 +466,36 @@ export default function AdminReportsPage() {
 
   return (
     <div className="space-y-6 text-left">
-      <div>
-        <Breadcrumb items={[{ label: 'Relatórios' }]} />
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mt-2 border-b border-brand-grey/15 pb-4">
+      {!embedded && (
+        <div>
+          <Breadcrumb items={[{ label: 'Relatórios' }]} />
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mt-2 border-b border-brand-grey/15 pb-4">
+            <div>
+              <h1 className="text-2xl font-black italic uppercase tracking-tight text-white">
+                Relatórios & Auditoria
+              </h1>
+              <p className="text-xs text-brand-grey uppercase tracking-widest font-mono mt-1">
+                Consulte indicadores comerciais, oficina, caixa, estoque e logs reais do sistema
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={fetchReports} disabled={isLoading}>
+                <RefreshCw className="w-4 h-4" /> Atualizar
+              </Button>
+              <Button size="sm" onClick={exportCurrent} disabled={isLoading}>
+                <Download className="w-4 h-4" /> Exportar CSV
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {embedded && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-black italic uppercase tracking-tight text-white">
-              Relatórios & Auditoria
-            </h1>
-            <p className="text-xs text-brand-grey uppercase tracking-widest font-mono mt-1">
-              Consulte indicadores comerciais, oficina, caixa, estoque e logs reais do sistema
-            </p>
+            <p className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-brand-red">Relatório de vendas</p>
+            <h2 className="mt-2 text-xl font-black uppercase italic text-white">Resultados comerciais</h2>
+            <p className="mt-1 text-xs font-mono uppercase tracking-wider text-brand-grey">Vendas de mercadorias e serviços consolidadas por período</p>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="secondary" onClick={fetchReports} disabled={isLoading}>
@@ -441,7 +506,7 @@ export default function AdminReportsPage() {
             </Button>
           </div>
         </div>
-      </div>
+      )}
 
       <Card>
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
@@ -461,7 +526,7 @@ export default function AdminReportsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+        {!salesOnly && <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -474,7 +539,7 @@ export default function AdminReportsPage() {
               </button>
             );
           })}
-        </div>
+        </div>}
 
         {isLoading ? (
           <div className="space-y-4">
@@ -484,7 +549,7 @@ export default function AdminReportsPage() {
         ) : (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {metricCards.map((metric) => {
+              {(salesOnly ? metricCards.slice(0, 2) : metricCards).map((metric) => {
                 const Icon = metric.icon;
                 return (
                   <div key={metric.label} className="border border-brand-grey/15 bg-brand-input/40 p-4">
@@ -519,7 +584,7 @@ export default function AdminReportsPage() {
               </div>
             )}
 
-            {activeTab === 'sales' && (
+            {(activeTab === 'sales' || salesOnly) && (
               <ReportPanel title="Relatório Comercial">
                 <DataTable
                   empty="Nenhum pedido ou orçamento encontrado no período."
@@ -543,7 +608,7 @@ export default function AdminReportsPage() {
               </ReportPanel>
             )}
 
-            {activeTab === 'workshop' && (
+            {(activeTab === 'workshop' || salesOnly) && (
               <ReportPanel title="Relatório de Oficina">
                 <DataTable
                   empty="Nenhuma ordem de serviço encontrada no período."
@@ -616,6 +681,10 @@ export default function AdminReportsPage() {
       </Card>
     </div>
   );
+}
+
+export default function AdminReportsPage() {
+  return <ReportsWorkspace />;
 }
 
 function ReportPanel({ title, children }: { title: string; children: React.ReactNode }) {
