@@ -192,7 +192,7 @@ export function CounterSaleModal({ open, onClose, onCompleted }: CounterSaleModa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-xs">
-      <Card className="relative max-h-[92vh] w-full max-w-4xl overflow-y-auto p-6" withStripe>
+      <Card className="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto p-6" withStripe>
         <button type="button" onClick={close} className="absolute right-4 top-4 text-brand-grey transition-colors hover:text-white">
           <X className="h-5 w-5" />
         </button>
@@ -221,8 +221,41 @@ export function CounterSaleModal({ open, onClose, onCompleted }: CounterSaleModa
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="space-y-4">
+            <div className="border border-brand-grey/15 bg-brand-black/50 p-4">
+              <p className="mb-3 text-[10px] font-mono uppercase tracking-widest text-brand-red">Informações da venda</p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-1 lg:col-span-2">
+                  <label className="text-[10px] font-mono uppercase text-brand-grey">Cliente cadastrado (opcional)</label>
+                  <select value={customerId} onChange={(event) => selectCustomer(event.target.value)} className="w-full rounded border border-brand-grey/25 bg-brand-input px-3 py-2 text-xs font-mono text-white focus:border-brand-red focus:outline-none">
+                    <option value="">Consumidor não identificado</option>
+                    {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.full_name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1 lg:col-span-2">
+                  <label className="text-[10px] font-mono uppercase text-brand-grey">Forma de pagamento</label>
+                  <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="w-full rounded border border-brand-grey/25 bg-brand-input px-3 py-2 text-xs font-mono text-white focus:border-brand-red focus:outline-none">
+                    <option>Dinheiro</option>
+                    <option>PIX</option>
+                    <option>Cartão de débito</option>
+                    <option>Cartão de crédito</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono uppercase text-brand-grey">Nome</label>
+                  <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} disabled={Boolean(customerId)} placeholder="Cliente avulso (opcional)" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono uppercase text-brand-grey">E-mail</label>
+                  <Input type="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} disabled={Boolean(customerId)} placeholder="Opcional" />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-[10px] font-mono uppercase text-brand-grey">Observações</label>
+                  <Input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Informações adicionais da venda (opcional)" />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
                 <div className="flex gap-2">
                   <select
                     value={productId}
@@ -274,38 +307,6 @@ export function CounterSaleModal({ open, onClose, onCompleted }: CounterSaleModa
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div className="space-y-4 border border-brand-grey/15 bg-brand-black/50 p-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono uppercase text-brand-grey">Cliente cadastrado (opcional)</label>
-                  <select value={customerId} onChange={(event) => selectCustomer(event.target.value)} className="w-full rounded border border-brand-grey/25 bg-brand-input px-3 py-2 text-xs font-mono text-white focus:border-brand-red focus:outline-none">
-                    <option value="">Consumidor não identificado</option>
-                    {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.full_name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono uppercase text-brand-grey">Nome</label>
-                  <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} disabled={Boolean(customerId)} placeholder="Cliente avulso (opcional)" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono uppercase text-brand-grey">E-mail</label>
-                  <Input type="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} disabled={Boolean(customerId)} placeholder="Opcional" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono uppercase text-brand-grey">Forma de pagamento</label>
-                  <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="w-full rounded border border-brand-grey/25 bg-brand-input px-3 py-2 text-xs font-mono text-white focus:border-brand-red focus:outline-none">
-                    <option>Dinheiro</option>
-                    <option>PIX</option>
-                    <option>Cartão de débito</option>
-                    <option>Cartão de crédito</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono uppercase text-brand-grey">Observações</label>
-                  <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} className="w-full rounded border border-brand-grey/25 bg-brand-input px-3 py-2 text-xs font-mono text-white focus:border-brand-red focus:outline-none" />
-                </div>
-              </div>
             </div>
 
             <div className="flex flex-col gap-4 border-t border-brand-grey/15 pt-5 sm:flex-row sm:items-center sm:justify-between">
