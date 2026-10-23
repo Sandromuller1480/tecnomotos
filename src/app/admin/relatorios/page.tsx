@@ -33,6 +33,7 @@ type ReportTab = 'overview' | 'sales' | 'workshop' | 'financial' | 'inventory' |
 interface OrderRow {
   id: string;
   customer_email: string;
+  customer_name: string | null;
   status: string;
   total_amount: number | string;
   payment_date: string | null;
@@ -127,6 +128,10 @@ function auditUser(audit: AuditRow) {
   return Array.isArray(audit.user) ? audit.user[0] : audit.user;
 }
 
+function orderCustomerName(order: OrderRow) {
+  return order.customer_name?.trim() || order.customer_email;
+}
+
 function csvEscape(value: unknown) {
   const text = String(value ?? '');
   return `"${text.replace(/"/g, '""')}"`;
@@ -215,7 +220,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
 
       if (salesOnly) {
         const [ordersRes, serviceOrdersRes] = await Promise.all([
-          supabase.from('orders').select('id, customer_email, status, total_amount, payment_date, created_at').order('created_at', { ascending: false }),
+          supabase.from('orders').select('id, customer_email, customer_name, status, total_amount, payment_date, created_at').order('created_at', { ascending: false }),
           supabase.from('service_orders').select('id, service_type, status, total_price, created_at').order('created_at', { ascending: false })
         ]);
 
@@ -240,7 +245,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
         quotationRows,
         auditRows
       ] = await Promise.all([
-        supabase.from('orders').select('id, customer_email, status, total_amount, payment_date, created_at').order('created_at', { ascending: false }),
+        supabase.from('orders').select('id, customer_email, customer_name, status, total_amount, payment_date, created_at').order('created_at', { ascending: false }),
         supabase.from('service_orders').select('id, service_type, status, total_price, created_at').order('created_at', { ascending: false }),
         supabase.from('products').select('id, sku, name, brand, price, cost_price, stock_quantity, min_stock_quantity, stripe_sync_status').order('name', { ascending: true }),
         supabase.from('customers').select('id', { count: 'exact', head: true }),
@@ -302,7 +307,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
         type: 'INCOME',
         status: 'PAID',
         category: 'Venda Online',
-        description: `Pedido #${order.id.slice(0, 8).toUpperCase()} - ${order.customer_email}`,
+        description: `Pedido #${order.id.slice(0, 8).toUpperCase()} - ${orderCustomerName(order)}`,
         amount: order.total_amount,
         payment_method: 'Stripe',
         source: 'ORDER',
@@ -327,7 +332,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
       .filter((row) => !query || `${row.category} ${row.description} ${row.source}`.toLowerCase().includes(query));
 
     return {
-      orders: orders.filter((row) => !query || `${row.customer_email} ${row.status} ${row.id}`.toLowerCase().includes(query)),
+      orders: orders.filter((row) => !query || `${row.customer_name || ''} ${row.customer_email} ${row.status} ${row.id}`.toLowerCase().includes(query)),
       serviceOrders: serviceOrders.filter((row) => !query || `${row.service_type} ${row.status} ${row.id}`.toLowerCase().includes(query)),
       financial,
       quotations: quotations.filter((row) => !query || `${row.title} ${row.customer_name || ''} ${row.status}`.toLowerCase().includes(query)),
@@ -373,7 +378,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
         ...scoped.orders.map((order) => ({
           tipo: 'Venda de peças e produtos',
           id: order.id,
-          descricao: order.customer_email,
+          descricao: orderCustomerName(order),
           status: order.status,
           total: asNumber(order.total_amount),
           data: order.created_at
@@ -406,6 +411,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
     if (activeTab === 'sales') {
       downloadCsv(`relatorio-comercial-${today}.csv`, scoped.orders.map((order) => ({
         id: order.id,
+        cliente: orderCustomerName(order),
         cliente_email: order.customer_email,
         status: order.status,
         total: asNumber(order.total_amount),
@@ -627,7 +633,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
                   rows={[
                     ...scoped.orders.map((order) => ({
                       código: `Pedido ${order.id.slice(0, 8).toUpperCase()}`,
-                      cliente: order.customer_email,
+                      cliente: orderCustomerName(order),
                       status: order.status,
                       valor: money(asNumber(order.total_amount)),
                       data: new Date(order.created_at).toLocaleDateString('pt-BR'),
