@@ -21,6 +21,7 @@ import {
   FileText,
   Eye,
   Package,
+  Printer,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -474,6 +475,53 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
     document.body.removeChild(link);
   };
 
+  const printDetailPdf = async (kind: 'sale' | 'service', id: string) => {
+    const resource = kind === 'sale' ? 'vendas' : 'servicos';
+
+    try {
+      const response = await fetch(`/api/relatorios/${resource}/${id}?format=pdf`, {
+        cache: 'no-store'
+      });
+      if (!response.ok) throw new Error('Não foi possível preparar o documento para impressão.');
+
+      const pdfUrl = URL.createObjectURL(await response.blob());
+      const frame = document.createElement('iframe');
+      frame.title = kind === 'sale' ? 'Impressão da venda' : 'Impressão do serviço';
+      frame.style.position = 'fixed';
+      frame.style.right = '0';
+      frame.style.bottom = '0';
+      frame.style.width = '0';
+      frame.style.height = '0';
+      frame.style.border = '0';
+
+      const cleanup = () => {
+        URL.revokeObjectURL(pdfUrl);
+        frame.remove();
+      };
+
+      frame.onload = () => {
+        window.setTimeout(() => {
+          const printWindow = frame.contentWindow;
+          if (!printWindow) {
+            cleanup();
+            error('Erro ao imprimir', 'O navegador não conseguiu abrir a impressão do documento.');
+            return;
+          }
+
+          printWindow.addEventListener('afterprint', cleanup, { once: true });
+          printWindow.focus();
+          printWindow.print();
+          window.setTimeout(cleanup, 60_000);
+        }, 300);
+      };
+
+      frame.src = pdfUrl;
+      document.body.appendChild(frame);
+    } catch (printError) {
+      error('Erro ao imprimir', printError instanceof Error ? printError.message : 'Não foi possível preparar o documento para impressão.');
+    }
+  };
+
   const detailActions = (kind: 'sale' | 'service', id: string) => (
     <div className="flex items-center justify-end gap-2">
       <button
@@ -493,6 +541,15 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
         className="flex h-8 w-8 items-center justify-center border border-brand-grey/25 text-brand-grey transition-colors hover:border-brand-red hover:text-brand-red"
       >
         <Download className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => void printDetailPdf(kind, id)}
+        title={kind === 'sale' ? 'Imprimir venda completa' : 'Imprimir serviço completo'}
+        aria-label={kind === 'sale' ? 'Imprimir venda completa' : 'Imprimir serviço completo'}
+        className="flex h-8 w-8 items-center justify-center border border-brand-grey/25 text-brand-grey transition-colors hover:border-brand-red hover:text-brand-red"
+      >
+        <Printer className="h-4 w-4" />
       </button>
     </div>
   );
