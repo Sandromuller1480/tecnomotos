@@ -88,6 +88,7 @@ export class FocusNFeProvider implements FiscalProvider {
     const auth = Buffer.from(`${this.token}:`).toString('base64');
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...init,
+      signal: init.signal || AbortSignal.timeout(20_000),
       headers: {
         accept: 'application/json',
         'content-type': 'application/json',
@@ -182,8 +183,8 @@ export class FocusNFeProvider implements FiscalProvider {
       series: this.firstString(response.serie),
       accessKey: this.firstString(response.chave_nfe, response.chave, response.chave_acesso),
       protocol,
-      xmlUrl: this.firstString(response.caminho_xml_nota_fiscal, response.xml_url),
-      danfceUrl: this.firstString(response.caminho_danfe, response.danfce_url, response.danfe_url),
+      xmlUrl: this.resolveFocusUrl(this.firstString(response.caminho_xml_nota_fiscal, response.xml_url)),
+      danfceUrl: this.resolveFocusUrl(this.firstString(response.caminho_danfe, response.danfce_url, response.danfe_url)),
       qrCodeUrl: this.firstString(response.qrcode_url, response.qr_code_url, response.qrcode),
       errorCode: this.firstString(response.codigo, response.codigo_sefaz),
       errorMessage: status === 'authorized' ? undefined : errorMessage,
@@ -220,5 +221,15 @@ export class FocusNFeProvider implements FiscalProvider {
   private firstString(...values: unknown[]) {
     const value = values.find((entry) => entry !== undefined && entry !== null && String(entry).length > 0);
     return value === undefined ? undefined : String(value);
+  }
+
+  private resolveFocusUrl(value?: string) {
+    if (!value) return undefined;
+
+    try {
+      return new URL(value, this.baseUrl).toString();
+    } catch {
+      return value;
+    }
   }
 }

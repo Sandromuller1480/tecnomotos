@@ -25,6 +25,7 @@ FISCAL_NFCE_SERIES=1
 FISCAL_NFCE_START_NUMBER=1
 FOCUS_NFE_HOMOLOGATION_TOKEN=
 FOCUS_NFE_PRODUCTION_TOKEN=
+FOCUS_NFE_WEBHOOK_SECRET=
 ```
 
 Tokens Focus devem existir somente no backend/Vercel Environment Variables. Nunca coloque token, certificado, CSC ou senha no frontend ou no Git.
@@ -76,7 +77,15 @@ Use `/api/fiscal/cancel` com `documentId` e `reason`. O backend valida permissao
 
 Endpoint criado: `/api/webhooks/focusnfe`.
 
-O webhook calcula hash do payload para idempotencia em `fiscal_webhook_events`, localiza o documento pela referencia e atualiza o status. Ele responde rapidamente e nao armazena segredos.
+O webhook exige o cabecalho `x-focusnfe-webhook-secret`, calcula hash do payload para idempotencia em `fiscal_webhook_events`, localiza o documento pela referencia e atualiza o status. Ele responde rapidamente e nao armazena segredos.
+
+No Painel API da Focus, crie o evento `nfce` apontando para:
+
+```text
+https://SEU-DOMINIO/api/webhooks/focusnfe
+```
+
+Defina `authorization_header` como `x-focusnfe-webhook-secret` e `authorization` com exatamente o mesmo valor de `FOCUS_NFE_WEBHOOK_SECRET` configurado no backend.
 
 ## Homologacao
 
