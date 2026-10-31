@@ -59,7 +59,10 @@ export class FocusNFeProvider implements FiscalProvider {
   }
 
   async getServiceStatus() {
-    await this.request('/v2/empresas', { method: 'GET' });
+    // The company-management endpoint is not exposed by the homologation host.
+    // A missing NFC-e reference still passes through Focus authentication:
+    // valid token => 404, invalid token => 401.
+    await this.request('/v2/nfce/tecnomotos-connection-check', { method: 'GET' }, [404]);
 
     return {
       status: 'ONLINE' as const,
@@ -84,7 +87,7 @@ export class FocusNFeProvider implements FiscalProvider {
     return token;
   }
 
-  private async request(path: string, init: RequestInit) {
+  private async request(path: string, init: RequestInit, acceptedStatuses: number[] = []) {
     const auth = Buffer.from(`${this.token}:`).toString('base64');
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...init,
@@ -100,7 +103,7 @@ export class FocusNFeProvider implements FiscalProvider {
     const text = await response.text();
     const payload = text ? this.parseJson(text) : {};
 
-    if (!response.ok) {
+    if (!response.ok && !acceptedStatuses.includes(response.status)) {
       const message = this.extractMessage(payload) || `Focus NFe retornou HTTP ${response.status}.`;
       const error = new Error(message);
       (error as Error & { payload?: unknown }).payload = payload;
