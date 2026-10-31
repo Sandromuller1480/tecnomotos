@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,7 +31,32 @@ interface Product {
   stripe_sync_status?: string | null;
   stripe_sync_error?: string | null;
   stripe_last_synced_at?: string | null;
+  gtin?: string | null;
+  ncm?: string | null;
+  cest?: string | null;
+  cfop?: string | null;
+  cst?: string | null;
+  csosn?: string | null;
+  origin?: number | null;
+  fiscal_origin?: number | null;
+  unit?: string | null;
+  taxable_unit?: string | null;
 }
+
+const fiscalOriginOptions = [
+  { value: '', label: 'Selecione a origem' },
+  { value: '0', label: '0 - Nacional' },
+  { value: '1', label: '1 - Estrangeira: importação direta' },
+  { value: '2', label: '2 - Estrangeira: adquirida no mercado interno' },
+  { value: '3', label: '3 - Nacional, conteúdo de importação superior a 40%' },
+  { value: '4', label: '4 - Nacional, produção conforme processos básicos' },
+  { value: '5', label: '5 - Nacional, conteúdo de importação até 40%' },
+  { value: '6', label: '6 - Estrangeira: importação direta sem similar nacional' },
+  { value: '7', label: '7 - Estrangeira: mercado interno sem similar nacional' },
+  { value: '8', label: '8 - Nacional, conteúdo de importação superior a 70%' }
+];
+
+const digitsOnly = (value: string, maxLength: number) => value.replace(/\D/g, '').slice(0, maxLength);
 
 export default function AdminProductsPage() {
   const router = useRouter();
@@ -59,6 +85,14 @@ export default function AdminProductsPage() {
   const [minStock, setMinStock] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [showInStore, setShowInStore] = useState(false);
+  const [gtin, setGtin] = useState('');
+  const [ncm, setNcm] = useState('');
+  const [cest, setCest] = useState('');
+  const [cfop, setCfop] = useState('');
+  const [cst, setCst] = useState('');
+  const [csosn, setCsosn] = useState('');
+  const [fiscalOrigin, setFiscalOrigin] = useState('');
+  const [fiscalUnit, setFiscalUnit] = useState('UN');
   const [isSyncingAll, setIsSyncingAll] = useState(false);
 
   const handleSyncPending = async () => {
@@ -162,6 +196,25 @@ export default function AdminProductsPage() {
     setMinStock('');
     setImageFile(null);
     setShowInStore(false);
+    setGtin('');
+    setNcm('');
+    setCest('');
+    setCfop('');
+    setCst('');
+    setCsosn('');
+    setFiscalOrigin('');
+    setFiscalUnit('UN');
+  };
+
+  const validateFiscalFields = () => {
+    if (ncm && ncm.length !== 8) return 'O NCM deve conter exatamente 8 dígitos.';
+    if (cest && cest.length !== 7) return 'O CEST deve conter exatamente 7 dígitos.';
+    if (cfop && cfop.length !== 4) return 'O CFOP deve conter exatamente 4 dígitos.';
+    if (cst && cst.length !== 2) return 'O CST do ICMS deve conter exatamente 2 dígitos.';
+    if (csosn && csosn.length !== 3) return 'O CSOSN deve conter exatamente 3 dígitos.';
+    if (cst && csosn) return 'Preencha CST ou CSOSN, nunca os dois ao mesmo tempo.';
+    if (gtin && ![8, 12, 13, 14].includes(gtin.length)) return 'O GTIN deve conter 8, 12, 13 ou 14 dígitos.';
+    return null;
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,6 +228,9 @@ export default function AdminProductsPage() {
     setIsSaving(true);
 
     try {
+      const fiscalError = validateFiscalFields();
+      if (fiscalError) throw new Error(fiscalError);
+
       // 1. Resolve optional default fields
       const finalSku = sku.trim() || `SKU-${Math.floor(100000 + Math.random() * 900000)}`;
       const finalName = name.trim() || 'Produto Sem Nome';
@@ -215,7 +271,17 @@ export default function AdminProductsPage() {
           min_stock_quantity: finalMinStock,
           category: category.trim() || null,
           image_url: uploadedImageUrl || null,
-          show_in_store: showInStore
+          show_in_store: showInStore,
+          gtin: gtin || null,
+          ncm: ncm || null,
+          cest: cest || null,
+          cfop: cfop || null,
+          cst: cst || null,
+          csosn: csosn || null,
+          origin: fiscalOrigin === '' ? null : Number(fiscalOrigin),
+          fiscal_origin: fiscalOrigin === '' ? null : Number(fiscalOrigin),
+          unit: fiscalUnit.trim().toUpperCase() || null,
+          taxable_unit: fiscalUnit.trim().toUpperCase() || null
         })
         .select('id')
         .single();
@@ -254,7 +320,7 @@ export default function AdminProductsPage() {
 
   const handleCancelarCadastro = () => {
     // If any field is filled, reset them
-    if (sku || location || name || brand || category || price || stockQuantity || minStock || imageFile || showInStore) {
+    if (sku || location || name || brand || category || price || stockQuantity || minStock || imageFile || showInStore || gtin || ncm || cest || cfop || cst || csosn || fiscalOrigin || fiscalUnit !== 'UN') {
       resetForm();
       info('Campos Limpos', 'O formulário foi resetado para o próximo produto.');
     }
@@ -270,6 +336,14 @@ export default function AdminProductsPage() {
     setStockQuantity(p.stock_quantity.toString());
     setMinStock((p.min_stock_quantity || 0).toString());
     setShowInStore(!!p.show_in_store);
+    setGtin(p.gtin || '');
+    setNcm(p.ncm || '');
+    setCest(p.cest || '');
+    setCfop(p.cfop || '');
+    setCst(p.cst || '');
+    setCsosn(p.csosn || '');
+    setFiscalOrigin(String(p.fiscal_origin ?? p.origin ?? ''));
+    setFiscalUnit(p.taxable_unit || p.unit || 'UN');
     setSelectedProduct(p);
     setIsEditModalOpen(true);
   };
@@ -280,6 +354,9 @@ export default function AdminProductsPage() {
     setIsSaving(true);
 
     try {
+      const fiscalError = validateFiscalFields();
+      if (fiscalError) throw new Error(fiscalError);
+
       const finalSku = sku.trim() || selectedProduct.sku;
       const finalName = name.trim() || 'Produto Sem Nome';
       const finalPrice = parseFloat(price) || 0;
@@ -319,7 +396,17 @@ export default function AdminProductsPage() {
           min_stock_quantity: finalMinStock,
           category: category.trim() || null,
           image_url: uploadedImageUrl,
-          show_in_store: showInStore
+          show_in_store: showInStore,
+          gtin: gtin || null,
+          ncm: ncm || null,
+          cest: cest || null,
+          cfop: cfop || null,
+          cst: cst || null,
+          csosn: csosn || null,
+          origin: fiscalOrigin === '' ? null : Number(fiscalOrigin),
+          fiscal_origin: fiscalOrigin === '' ? null : Number(fiscalOrigin),
+          unit: fiscalUnit.trim().toUpperCase() || null,
+          taxable_unit: fiscalUnit.trim().toUpperCase() || null
         })
         .eq('sku', selectedProduct.sku); // Match by original SKU
 
@@ -508,7 +595,7 @@ export default function AdminProductsPage() {
       {/* REGISTRATION MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-xs">
-          <Card className="w-full max-w-xl mx-4 relative p-6 space-y-6 max-h-[90vh] overflow-y-auto" withStripe>
+          <Card className="w-full max-w-3xl mx-4 relative p-6 space-y-6 max-h-[90vh] overflow-y-auto" withStripe>
             {/* Close Button (X) */}
             <button
               onClick={() => {
@@ -599,6 +686,46 @@ export default function AdminProductsPage() {
                     onChange={(e) => setMinStock(e.target.value)}
                   />
                 </div>
+                <div className="md:col-span-2 mt-2 border-t border-brand-grey/15 pt-4">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-white">Dados fiscais</h4>
+                  <p className="mt-1 text-[10px] font-mono text-brand-grey">
+                    Preencha conforme orientação do contador. Estes dados são necessários para emitir NFC-e.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">NCM</label>
+                  <Input inputMode="numeric" placeholder="8 dígitos" value={ncm} onChange={(e) => setNcm(digitsOnly(e.target.value, 8))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">CEST (quando aplicável)</label>
+                  <Input inputMode="numeric" placeholder="7 dígitos" value={cest} onChange={(e) => setCest(digitsOnly(e.target.value, 7))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">CFOP padrão para NFC-e</label>
+                  <Input inputMode="numeric" placeholder="4 dígitos" value={cfop} onChange={(e) => setCfop(digitsOnly(e.target.value, 4))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">CSOSN (Simples Nacional)</label>
+                  <Input inputMode="numeric" placeholder="3 dígitos" value={csosn} onChange={(e) => setCsosn(digitsOnly(e.target.value, 3))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">CST ICMS (regime normal)</label>
+                  <Input inputMode="numeric" placeholder="Deixe vazio no Simples" value={cst} onChange={(e) => setCst(digitsOnly(e.target.value, 2))} />
+                </div>
+                <Select
+                  label="Origem da mercadoria"
+                  value={fiscalOrigin}
+                  onChange={(e) => setFiscalOrigin(e.target.value)}
+                  options={fiscalOriginOptions}
+                />
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">Unidade fiscal</label>
+                  <Input maxLength={6} placeholder="UN" value={fiscalUnit} onChange={(e) => setFiscalUnit(e.target.value.toUpperCase())} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">GTIN / Código de barras</label>
+                  <Input inputMode="numeric" placeholder="8, 12, 13 ou 14 dígitos" value={gtin} onChange={(e) => setGtin(digitsOnly(e.target.value, 14))} />
+                </div>
                 {/* Checkbox for show_in_store */}
                 <div className="flex items-center gap-2 md:col-span-2 pt-2 pb-1">
                   <input
@@ -672,7 +799,7 @@ export default function AdminProductsPage() {
       {/* EDIT MODAL */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-xs">
-          <Card className="w-full max-w-xl mx-4 relative p-6 space-y-6 max-h-[90vh] overflow-y-auto" withStripe>
+          <Card className="w-full max-w-3xl mx-4 relative p-6 space-y-6 max-h-[90vh] overflow-y-auto" withStripe>
             {/* Close Button (X) */}
             <button
               onClick={() => {
@@ -764,6 +891,46 @@ export default function AdminProductsPage() {
                     value={minStock}
                     onChange={(e) => setMinStock(e.target.value)}
                   />
+                </div>
+                <div className="md:col-span-2 mt-2 border-t border-brand-grey/15 pt-4">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-white">Dados fiscais</h4>
+                  <p className="mt-1 text-[10px] font-mono text-brand-grey">
+                    Preencha conforme orientação do contador. Estes dados são necessários para emitir NFC-e.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">NCM</label>
+                  <Input inputMode="numeric" placeholder="8 dígitos" value={ncm} onChange={(e) => setNcm(digitsOnly(e.target.value, 8))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">CEST (quando aplicável)</label>
+                  <Input inputMode="numeric" placeholder="7 dígitos" value={cest} onChange={(e) => setCest(digitsOnly(e.target.value, 7))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">CFOP padrão para NFC-e</label>
+                  <Input inputMode="numeric" placeholder="4 dígitos" value={cfop} onChange={(e) => setCfop(digitsOnly(e.target.value, 4))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">CSOSN (Simples Nacional)</label>
+                  <Input inputMode="numeric" placeholder="3 dígitos" value={csosn} onChange={(e) => setCsosn(digitsOnly(e.target.value, 3))} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">CST ICMS (regime normal)</label>
+                  <Input inputMode="numeric" placeholder="Deixe vazio no Simples" value={cst} onChange={(e) => setCst(digitsOnly(e.target.value, 2))} />
+                </div>
+                <Select
+                  label="Origem da mercadoria"
+                  value={fiscalOrigin}
+                  onChange={(e) => setFiscalOrigin(e.target.value)}
+                  options={fiscalOriginOptions}
+                />
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">Unidade fiscal</label>
+                  <Input maxLength={6} placeholder="UN" value={fiscalUnit} onChange={(e) => setFiscalUnit(e.target.value.toUpperCase())} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">GTIN / Código de barras</label>
+                  <Input inputMode="numeric" placeholder="8, 12, 13 ou 14 dígitos" value={gtin} onChange={(e) => setGtin(digitsOnly(e.target.value, 14))} />
                 </div>
                 {/* Checkbox for show_in_store */}
                 <div className="flex items-center gap-2 md:col-span-2 pt-2 pb-1">
