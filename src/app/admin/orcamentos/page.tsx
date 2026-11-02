@@ -395,6 +395,11 @@ export default function AdminQuotationsPage() {
 
   const addItem = () => setItems((current) => [...current, emptyItem()]);
   const removeItem = (index: number) => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  const handleItemKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    addItem();
+  };
 
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
 
@@ -989,15 +994,16 @@ export default function AdminQuotationsPage() {
                           ))}
                         </select>
                       ) : (
-                        <Input value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} placeholder="Descrição do serviço" required />
+                        <Input value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} onKeyDown={handleItemKeyDown} placeholder="Descrição do serviço" required />
                       )}
-                      <Input inputMode="decimal" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} placeholder="Qtd" required />
-                      <Input inputMode="decimal" value={item.unit_price} onChange={(event) => updateItem(index, { unit_price: event.target.value })} placeholder="Valor" required />
+                      <Input inputMode="decimal" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} onKeyDown={handleItemKeyDown} placeholder="Qtd" required />
+                      <Input inputMode="decimal" value={item.unit_price} onChange={(event) => updateItem(index, { unit_price: event.target.value })} onKeyDown={handleItemKeyDown} placeholder="Valor" required />
                       <button
                         type="button"
                         onClick={() => removeItem(index)}
-                        disabled={items.length === 1}
-                        className="h-10 border border-brand-grey/25 text-brand-grey hover:text-brand-red disabled:opacity-30"
+                        aria-label={`Excluir item ${index + 1}`}
+                        title="Excluir item"
+                        className="h-10 border border-brand-grey/25 text-brand-grey transition-colors hover:border-brand-red/60 hover:text-brand-red"
                       >
                         <Trash2 className="w-4 h-4 mx-auto" />
                       </button>
