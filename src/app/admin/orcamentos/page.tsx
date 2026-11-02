@@ -395,7 +395,7 @@ export default function AdminQuotationsPage() {
 
   const addItem = () => setItems((current) => [...current, emptyItem()]);
   const removeItem = (index: number) => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
-  const handleItemKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleAddItemKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
     addItem();
@@ -865,7 +865,7 @@ export default function AdminQuotationsPage() {
               )}
             </div>
 
-            <form onSubmit={handleSaveQuotation} className="space-y-5 text-left">
+            <form onSubmit={handleSaveQuotation} onKeyDown={handleAddItemKeyDown} className="space-y-5 text-left">
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -994,10 +994,10 @@ export default function AdminQuotationsPage() {
                           ))}
                         </select>
                       ) : (
-                        <Input value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} onKeyDown={handleItemKeyDown} placeholder="Descrição do serviço" required />
+                        <Input value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} placeholder="Descrição do serviço" required />
                       )}
-                      <Input inputMode="decimal" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} onKeyDown={handleItemKeyDown} placeholder="Qtd" required />
-                      <Input inputMode="decimal" value={item.unit_price} onChange={(event) => updateItem(index, { unit_price: event.target.value })} onKeyDown={handleItemKeyDown} placeholder="Valor" required />
+                      <Input inputMode="decimal" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} placeholder="Qtd" required />
+                      <Input inputMode="decimal" value={item.unit_price} onChange={(event) => updateItem(index, { unit_price: event.target.value })} placeholder="Valor" required />
                       <button
                         type="button"
                         onClick={() => removeItem(index)}
