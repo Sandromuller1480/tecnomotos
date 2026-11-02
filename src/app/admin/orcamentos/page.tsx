@@ -973,11 +973,11 @@ export default function AdminQuotationsPage() {
 
                 <div className="space-y-3">
                   {items.map((item, index) => (
-                    <div key={index} className="grid grid-cols-1 lg:grid-cols-[130px_1fr_90px_120px_40px] gap-3 border border-brand-grey/15 bg-brand-input/40 p-3">
+                    <div key={index} className="grid grid-cols-1 lg:grid-cols-[minmax(0,130px)_minmax(0,1fr)_minmax(0,90px)_minmax(0,120px)_40px] gap-3 border border-brand-grey/15 bg-brand-input/40 p-3">
                       <select
                         value={item.item_type}
                         onChange={(event) => updateItem(index, { item_type: event.target.value as QuotationItemType, product_id: '' })}
-                        className="text-xs font-mono bg-brand-input border border-brand-grey/25 text-white rounded px-3 py-2 focus:outline-none focus:border-brand-red"
+                        className="w-full min-w-0 text-xs font-mono bg-brand-input border border-brand-grey/25 text-white rounded px-3 py-2 focus:outline-none focus:border-brand-red"
                       >
                         <option value="PRODUCT">Produto</option>
                         <option value="SERVICE">Serviço</option>
@@ -986,7 +986,7 @@ export default function AdminQuotationsPage() {
                         <select
                           value={item.product_id}
                           onChange={(event) => updateItem(index, { product_id: event.target.value })}
-                          className="text-xs font-mono bg-brand-input border border-brand-grey/25 text-white rounded px-3 py-2 focus:outline-none focus:border-brand-red"
+                          className="w-full min-w-0 text-xs font-mono bg-brand-input border border-brand-grey/25 text-white rounded px-3 py-2 focus:outline-none focus:border-brand-red"
                         >
                           <option value="">Selecione um produto</option>
                           {products.map((product) => (
