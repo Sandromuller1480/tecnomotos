@@ -626,7 +626,7 @@ export default function AdminQuotationsPage() {
             <p className="text-xs mt-2">Os orçamentos gerados aparecerão estruturados aqui.</p>
           </div>
         ) : (
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow>
                 <TableHead>Orçamento</TableHead>
@@ -635,28 +635,28 @@ export default function AdminQuotationsPage() {
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Validade</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead className="w-[120px] text-right 2xl:w-72">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredQuotations.map((quotation) => (
                 <TableRow key={quotation.id}>
                   <TableCell>
-                    <div className="font-black text-white uppercase">{quotation.title}</div>
+                    <div className="truncate font-black text-white uppercase" title={quotation.title}>{quotation.title}</div>
                     <div className="text-[10px] font-mono text-brand-grey">#{quotation.id.slice(0, 8).toUpperCase()}</div>
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm text-brand-silver">{quotation.customer_name || 'Sem cliente anexado'}</div>
-                    <div className="text-[10px] font-mono text-brand-grey">{quotation.customer_email || quotation.customer_phone || '-'}</div>
+                    <div className="truncate text-sm text-brand-silver" title={quotation.customer_name || 'Sem cliente anexado'}>{quotation.customer_name || 'Sem cliente anexado'}</div>
+                    <div className="truncate text-[10px] font-mono text-brand-grey" title={quotation.customer_email || quotation.customer_phone || '-'}>{quotation.customer_email || quotation.customer_phone || '-'}</div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-brand-grey">{quotation.vehicle_info || '-'}</TableCell>
-                  <TableCell className="font-mono text-sm text-white">{money(quotation.total_amount)}</TableCell>
+                  <TableCell className="truncate font-mono text-xs text-brand-grey" title={quotation.vehicle_info || '-'}>{quotation.vehicle_info || '-'}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-sm text-white">{money(quotation.total_amount)}</TableCell>
                   <TableCell><Badge variant={statusVariants[quotation.status]}>{statusLabels[quotation.status]}</Badge></TableCell>
                   <TableCell className="font-mono text-xs text-brand-grey">
                     {quotation.valid_until ? new Date(`${quotation.valid_until}T00:00:00`).toLocaleDateString('pt-BR') : '-'}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                  <TableCell className="w-[120px] text-right 2xl:w-72">
+                    <div className="flex flex-wrap justify-end gap-2 2xl:flex-nowrap">
                       <button
                         type="button"
                         onClick={() => setViewingQuotation(quotation)}
