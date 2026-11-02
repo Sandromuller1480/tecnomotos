@@ -986,7 +986,8 @@ export default function AdminQuotationsPage() {
 
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-xs">
-          <Card ref={quotationModalRef} onKeyDown={handleQuotationModalKeyDown} className="w-full max-w-4xl mx-4 relative p-6 space-y-6 max-h-[90vh] overflow-y-auto" withStripe>
+          <div ref={quotationModalRef} onKeyDown={handleQuotationModalKeyDown} className="w-full max-w-4xl mx-4">
+          <Card className="relative p-6 space-y-6 max-h-[90vh] overflow-y-auto" withStripe>
             <button
               onClick={() => {
                 setIsCreateModalOpen(false);
@@ -1019,7 +1020,7 @@ export default function AdminQuotationsPage() {
               )}
             </div>
 
-            <form onSubmit={handleSaveQuotation} onKeyDown={handleAddItemKeyDown} className="space-y-5 text-left">
+            <form onSubmit={handleSaveQuotation} className="space-y-5 text-left">
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -1120,7 +1121,7 @@ export default function AdminQuotationsPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b border-brand-grey/10 pb-2">
                   <h4 className="text-xs font-black uppercase tracking-wider text-brand-red">Itens do orçamento</h4>
-                  <Button type="button" size="sm" variant="secondary" onClick={addItem}>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => addItem()}>
                     <Plus className="w-3.5 h-3.5" /> Adicionar Item
                   </Button>
                 </div>
@@ -1226,6 +1227,7 @@ export default function AdminQuotationsPage() {
               </div>
             </form>
           </Card>
+          </div>
         </div>
       )}
 
