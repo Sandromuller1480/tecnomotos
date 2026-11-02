@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -30,6 +30,115 @@ interface ProductOption {
   name: string;
   sku: string | null;
   price: number;
+}
+
+interface ProductComboboxProps {
+  products: ProductOption[];
+  productId: string;
+  inputRef: (element: HTMLInputElement | null) => void;
+  onChange: (productId: string) => void;
+  onConfirm: () => void;
+}
+
+function ProductCombobox({ products, productId, inputRef, onChange, onConfirm }: ProductComboboxProps) {
+  const selectedProduct = products.find((product) => product.id === productId);
+  const [query, setQuery] = useState(selectedProduct?.name || '');
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const filteredProducts = products.filter((product) => {
+    const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
+    return !normalizedQuery || `${product.name} ${product.sku || ''}`.toLocaleLowerCase('pt-BR').includes(normalizedQuery);
+  });
+
+  useEffect(() => {
+    if (!isOpen) setQuery(selectedProduct?.name || '');
+  }, [isOpen, selectedProduct?.name]);
+
+  const selectProduct = (product: ProductOption) => {
+    setQuery(product.name);
+    setIsOpen(false);
+    onChange(product.id);
+    window.requestAnimationFrame(onConfirm);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsOpen(true);
+      setActiveIndex((current) => Math.min(current + 1, Math.max(filteredProducts.length - 1, 0)));
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsOpen(true);
+      setActiveIndex((current) => Math.max(current - 1, 0));
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      const product = filteredProducts[activeIndex] || filteredProducts[0];
+      if (product) selectProduct(product);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative min-w-0">
+      <input
+        ref={inputRef}
+        type="text"
+        value={query}
+        onFocus={(event) => {
+          setQuery('');
+          setActiveIndex(0);
+          setIsOpen(true);
+          event.currentTarget.select();
+        }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setActiveIndex(0);
+          setIsOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 100)}
+        placeholder="Selecione ou pesquise um produto"
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-autocomplete="list"
+        className="w-full min-w-0 rounded border border-brand-grey/25 bg-brand-input px-3 py-2 text-xs font-mono text-white focus:border-brand-red focus:outline-none"
+      />
+      {isOpen && (
+        <div className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded border border-brand-grey/25 bg-brand-card shadow-2xl">
+          {filteredProducts.length === 0 ? (
+            <div className="px-3 py-2 text-xs font-mono text-brand-grey">Nenhum produto encontrado.</div>
+          ) : (
+            filteredProducts.map((product, index) => (
+              <button
+                key={product.id}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectProduct(product)}
+                className={`block w-full px-3 py-2 text-left text-xs font-mono transition-colors ${index === activeIndex ? 'bg-brand-red text-white' : 'text-brand-silver hover:bg-brand-grey/10 hover:text-white'}`}
+              >
+                {product.name} - {money(product.price)}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface QuotationItemForm {
@@ -127,6 +236,10 @@ export default function AdminQuotationsPage() {
   const router = useRouter();
   const supabase = createClient();
   const { success, error, info } = useToast();
+  const quotationModalRef = useRef<HTMLDivElement>(null);
+  const productInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const quantityInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const unitPriceInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
@@ -393,12 +506,53 @@ export default function AdminQuotationsPage() {
     }));
   };
 
-  const addItem = () => setItems((current) => [...current, emptyItem()]);
+  const focusItemField = (index: number, field: 'product' | 'quantity' | 'unitPrice') => {
+    const refs = field === 'product' ? productInputRefs : field === 'quantity' ? quantityInputRefs : unitPriceInputRefs;
+    window.requestAnimationFrame(() => refs.current[index]?.focus());
+  };
+
+  const addItem = (focusNewItem = false) => {
+    const nextItemIndex = items.length;
+    setItems((current) => [...current, emptyItem()]);
+    if (focusNewItem) focusItemField(nextItemIndex, 'product');
+  };
   const removeItem = (index: number) => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
-  const handleAddItemKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+
+  const moveModalFocus = (direction: 1 | -1) => {
+    const modal = quotationModalRef.current;
+    if (!modal) return;
+
+    const controls = Array.from(modal.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+    )).filter((element) => element.offsetParent !== null);
+    const currentIndex = controls.indexOf(document.activeElement as HTMLElement);
+    const nextIndex = currentIndex === -1
+      ? 0
+      : (currentIndex + direction + controls.length) % controls.length;
+    controls[nextIndex]?.focus();
+  };
+
+  const handleQuotationModalKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.defaultPrevented) return;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveModalFocus(1);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveModalFocus(-1);
+      return;
+    }
+
     if (event.key !== 'Enter') return;
+    const target = event.target as HTMLElement;
+    if (target instanceof HTMLButtonElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLInputElement && target.type === 'checkbox')) return;
+
     event.preventDefault();
-    addItem();
+    moveModalFocus(1);
   };
 
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
@@ -832,7 +986,7 @@ export default function AdminQuotationsPage() {
 
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-xs">
-          <Card className="w-full max-w-4xl mx-4 relative p-6 space-y-6 max-h-[90vh] overflow-y-auto" withStripe>
+          <Card ref={quotationModalRef} onKeyDown={handleQuotationModalKeyDown} className="w-full max-w-4xl mx-4 relative p-6 space-y-6 max-h-[90vh] overflow-y-auto" withStripe>
             <button
               onClick={() => {
                 setIsCreateModalOpen(false);
@@ -983,21 +1137,44 @@ export default function AdminQuotationsPage() {
                         <option value="SERVICE">Serviço</option>
                       </select>
                       {item.item_type === 'PRODUCT' ? (
-                        <select
-                          value={item.product_id}
-                          onChange={(event) => updateItem(index, { product_id: event.target.value })}
-                          className="w-full min-w-0 text-xs font-mono bg-brand-input border border-brand-grey/25 text-white rounded px-3 py-2 focus:outline-none focus:border-brand-red"
-                        >
-                          <option value="">Selecione um produto</option>
-                          {products.map((product) => (
-                            <option key={product.id} value={product.id}>{product.name} - {money(product.price)}</option>
-                          ))}
-                        </select>
+                        <ProductCombobox
+                          products={products}
+                          productId={item.product_id}
+                          inputRef={(element) => { productInputRefs.current[index] = element; }}
+                          onChange={(productId) => updateItem(index, { product_id: productId })}
+                          onConfirm={() => focusItemField(index, 'quantity')}
+                        />
                       ) : (
                         <Input value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} placeholder="Descrição do serviço" required />
                       )}
-                      <Input inputMode="decimal" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} placeholder="Qtd" required />
-                      <Input inputMode="decimal" value={item.unit_price} onChange={(event) => updateItem(index, { unit_price: event.target.value })} placeholder="Valor" required />
+                      <Input
+                        ref={(element) => { quantityInputRefs.current[index] = element; }}
+                        inputMode="decimal"
+                        value={item.quantity}
+                        onChange={(event) => updateItem(index, { quantity: event.target.value })}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter') return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          focusItemField(index, 'unitPrice');
+                        }}
+                        placeholder="Qtd"
+                        required
+                      />
+                      <Input
+                        ref={(element) => { unitPriceInputRefs.current[index] = element; }}
+                        inputMode="decimal"
+                        value={item.unit_price}
+                        onChange={(event) => updateItem(index, { unit_price: event.target.value })}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter') return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          addItem(true);
+                        }}
+                        placeholder="Valor"
+                        required
+                      />
                       <button
                         type="button"
                         onClick={() => removeItem(index)}
