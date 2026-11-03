@@ -1065,7 +1065,6 @@ export default function AdminQuotationsPage() {
               </div>
               {editingQuotation && (
                 <button
-                  ref={attachCustomerButtonRef}
                   type="button"
                   onClick={() => sendQuotationToWhatsapp(editingQuotation)}
                   className="inline-flex h-10 items-center justify-center gap-2 border border-[#25D366]/50 bg-brand-black px-4 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:border-[#25D366] hover:bg-[#25D366]/10"
@@ -1079,15 +1078,18 @@ export default function AdminQuotationsPage() {
             <form onSubmit={handleSaveQuotation} className="space-y-5 text-left">
               <div className="flex flex-wrap gap-2">
                 <button
-                  ref={withoutCustomerButtonRef}
+                  ref={attachCustomerButtonRef}
                   type="button"
+                  aria-pressed={attachCustomer}
                   onClick={() => setAttachCustomer(true)}
                   className={`px-3 py-2 text-[10px] font-mono uppercase border transition-colors ${attachCustomer ? 'bg-brand-red border-brand-red text-white' : 'border-brand-grey/25 text-brand-grey hover:text-white'}`}
                 >
                   Anexar cliente cadastrado
                 </button>
                 <button
+                  ref={withoutCustomerButtonRef}
                   type="button"
+                  aria-pressed={!attachCustomer}
                   onClick={() => {
                     setAttachCustomer(false);
                     setCustomerId('');
