@@ -526,36 +526,38 @@ export default function AdminQuotationsPage() {
     }
 
     const currentRect = currentControl.getBoundingClientRect();
-    const currentX = currentRect.left + currentRect.width / 2;
-    const currentY = currentRect.top + currentRect.height / 2;
     const isHorizontal = direction === 'left' || direction === 'right';
     const isInDirection = (element: HTMLElement) => {
       const rect = element.getBoundingClientRect();
-      const x = rect.left + rect.width / 2;
-      const y = rect.top + rect.height / 2;
-      if (direction === 'left') return x < currentX;
-      if (direction === 'right') return x > currentX;
-      if (direction === 'up') return y < currentY;
-      return y > currentY;
+      if (direction === 'left') return rect.right <= currentRect.left;
+      if (direction === 'right') return rect.left >= currentRect.right;
+      if (direction === 'up') return rect.bottom <= currentRect.top;
+      return rect.top >= currentRect.bottom;
     };
 
     const candidates = controls.filter((element) => element !== currentControl && isInDirection(element));
-    const nextControl = candidates.sort((first, second) => {
+    const controlsInSameAxis = candidates.filter((element) => {
+      const rect = element.getBoundingClientRect();
+      return isHorizontal
+        ? rect.bottom > currentRect.top && rect.top < currentRect.bottom
+        : rect.right > currentRect.left && rect.left < currentRect.right;
+    });
+    const nextControl = (controlsInSameAxis.length > 0 ? controlsInSameAxis : candidates).sort((first, second) => {
       const firstRect = first.getBoundingClientRect();
       const secondRect = second.getBoundingClientRect();
       const firstPrimary = isHorizontal
-        ? Math.abs((firstRect.left + firstRect.width / 2) - currentX)
-        : Math.abs((firstRect.top + firstRect.height / 2) - currentY);
+        ? Math.abs((direction === 'left' ? firstRect.right : firstRect.left) - (direction === 'left' ? currentRect.left : currentRect.right))
+        : Math.abs((direction === 'up' ? firstRect.bottom : firstRect.top) - (direction === 'up' ? currentRect.top : currentRect.bottom));
       const secondPrimary = isHorizontal
-        ? Math.abs((secondRect.left + secondRect.width / 2) - currentX)
-        : Math.abs((secondRect.top + secondRect.height / 2) - currentY);
+        ? Math.abs((direction === 'left' ? secondRect.right : secondRect.left) - (direction === 'left' ? currentRect.left : currentRect.right))
+        : Math.abs((direction === 'up' ? secondRect.bottom : secondRect.top) - (direction === 'up' ? currentRect.top : currentRect.bottom));
       const firstSecondary = isHorizontal
-        ? Math.abs((firstRect.top + firstRect.height / 2) - currentY)
-        : Math.abs((firstRect.left + firstRect.width / 2) - currentX);
+        ? Math.abs((firstRect.top + firstRect.height / 2) - (currentRect.top + currentRect.height / 2))
+        : Math.abs((firstRect.left + firstRect.width / 2) - (currentRect.left + currentRect.width / 2));
       const secondSecondary = isHorizontal
-        ? Math.abs((secondRect.top + secondRect.height / 2) - currentY)
-        : Math.abs((secondRect.left + secondRect.width / 2) - currentX);
-      return (firstPrimary * 1000 + firstSecondary) - (secondPrimary * 1000 + secondSecondary);
+        ? Math.abs((secondRect.top + secondRect.height / 2) - (currentRect.top + currentRect.height / 2))
+        : Math.abs((secondRect.left + secondRect.width / 2) - (currentRect.left + currentRect.width / 2));
+      return firstPrimary - secondPrimary || firstSecondary - secondSecondary;
     })[0];
 
     nextControl?.focus();
