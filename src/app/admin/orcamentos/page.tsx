@@ -62,7 +62,7 @@ function ProductCombobox({ products, productId, inputRef, onChange, onConfirm }:
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'ArrowDown') {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
       event.preventDefault();
       event.stopPropagation();
       setIsOpen(true);
@@ -70,7 +70,7 @@ function ProductCombobox({ products, productId, inputRef, onChange, onConfirm }:
       return;
     }
 
-    if (event.key === 'ArrowUp') {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
       event.preventDefault();
       event.stopPropagation();
       setIsOpen(true);
