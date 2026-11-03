@@ -231,6 +231,8 @@ export default function AdminQuotationsPage() {
   const supabase = createClient();
   const { success, error, info } = useToast();
   const quotationModalRef = useRef<HTMLDivElement>(null);
+  const attachCustomerButtonRef = useRef<HTMLButtonElement>(null);
+  const withoutCustomerButtonRef = useRef<HTMLButtonElement>(null);
   const productInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const quantityInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const unitPriceInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -466,6 +468,16 @@ export default function AdminQuotationsPage() {
     );
     setIsCreateModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!isCreateModalOpen) return;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      (attachCustomer ? attachCustomerButtonRef : withoutCustomerButtonRef).current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [isCreateModalOpen, attachCustomer]);
 
   const getPdfUrl = (quotationId: string) => `/api/orcamentos/${quotationId}/pdf`;
 
@@ -1053,6 +1065,7 @@ export default function AdminQuotationsPage() {
               </div>
               {editingQuotation && (
                 <button
+                  ref={attachCustomerButtonRef}
                   type="button"
                   onClick={() => sendQuotationToWhatsapp(editingQuotation)}
                   className="inline-flex h-10 items-center justify-center gap-2 border border-[#25D366]/50 bg-brand-black px-4 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:border-[#25D366] hover:bg-[#25D366]/10"
@@ -1066,6 +1079,7 @@ export default function AdminQuotationsPage() {
             <form onSubmit={handleSaveQuotation} className="space-y-5 text-left">
               <div className="flex flex-wrap gap-2">
                 <button
+                  ref={withoutCustomerButtonRef}
                   type="button"
                   onClick={() => setAttachCustomer(true)}
                   className={`px-3 py-2 text-[10px] font-mono uppercase border transition-colors ${attachCustomer ? 'bg-brand-red border-brand-red text-white' : 'border-brand-grey/25 text-brand-grey hover:text-white'}`}
