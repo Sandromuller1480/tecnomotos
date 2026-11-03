@@ -50,10 +50,6 @@ function ProductCombobox({ products, productId, inputRef, onChange, onConfirm }:
     return !normalizedQuery || `${product.name} ${product.sku || ''}`.toLocaleLowerCase('pt-BR').includes(normalizedQuery);
   });
 
-  useEffect(() => {
-    if (!isOpen) setQuery(selectedProduct?.name || '');
-  }, [isOpen, selectedProduct?.name]);
-
   const selectProduct = (product: ProductOption) => {
     setQuery(product.name);
     setIsOpen(false);
@@ -62,7 +58,7 @@ function ProductCombobox({ products, productId, inputRef, onChange, onConfirm }:
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+    if (event.key === 'ArrowDown') {
       event.preventDefault();
       event.stopPropagation();
       setIsOpen(true);
@@ -70,7 +66,7 @@ function ProductCombobox({ products, productId, inputRef, onChange, onConfirm }:
       return;
     }
 
-    if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+    if (event.key === 'ArrowUp') {
       event.preventDefault();
       event.stopPropagation();
       setIsOpen(true);
@@ -113,9 +109,6 @@ function ProductCombobox({ products, productId, inputRef, onChange, onConfirm }:
         onKeyDown={handleKeyDown}
         onBlur={() => window.setTimeout(() => setIsOpen(false), 100)}
         placeholder="Selecione ou pesquise um produto"
-        role="combobox"
-        aria-expanded={isOpen}
-        aria-autocomplete="list"
         className="w-full min-w-0 rounded border border-brand-grey/25 bg-brand-input px-3 py-2 text-xs font-mono text-white focus:border-brand-red focus:outline-none"
       />
       {isOpen && (
@@ -129,6 +122,7 @@ function ProductCombobox({ products, productId, inputRef, onChange, onConfirm }:
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => selectProduct(product)}
+                data-combobox-option
                 className={`block w-full px-3 py-2 text-left text-xs font-mono transition-colors ${index === activeIndex ? 'bg-brand-red text-white' : 'text-brand-silver hover:bg-brand-grey/10 hover:text-white'}`}
               >
                 {product.name} - {money(product.price)}
@@ -518,18 +512,53 @@ export default function AdminQuotationsPage() {
   };
   const removeItem = (index: number) => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
 
-  const moveModalFocus = (direction: 1 | -1) => {
+  const moveModalFocus = (direction: 'up' | 'down' | 'left' | 'right') => {
     const modal = quotationModalRef.current;
     if (!modal) return;
 
     const controls = Array.from(modal.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
-    )).filter((element) => element.offsetParent !== null);
-    const currentIndex = controls.indexOf(document.activeElement as HTMLElement);
-    const nextIndex = currentIndex === -1
-      ? 0
-      : (currentIndex + direction + controls.length) % controls.length;
-    controls[nextIndex]?.focus();
+    )).filter((element) => element.offsetParent !== null && !element.dataset.comboboxOption);
+    const currentControl = document.activeElement as HTMLElement;
+    if (!controls.includes(currentControl)) {
+      controls[0]?.focus();
+      return;
+    }
+
+    const currentRect = currentControl.getBoundingClientRect();
+    const currentX = currentRect.left + currentRect.width / 2;
+    const currentY = currentRect.top + currentRect.height / 2;
+    const isHorizontal = direction === 'left' || direction === 'right';
+    const isInDirection = (element: HTMLElement) => {
+      const rect = element.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      if (direction === 'left') return x < currentX;
+      if (direction === 'right') return x > currentX;
+      if (direction === 'up') return y < currentY;
+      return y > currentY;
+    };
+
+    const candidates = controls.filter((element) => element !== currentControl && isInDirection(element));
+    const nextControl = candidates.sort((first, second) => {
+      const firstRect = first.getBoundingClientRect();
+      const secondRect = second.getBoundingClientRect();
+      const firstPrimary = isHorizontal
+        ? Math.abs((firstRect.left + firstRect.width / 2) - currentX)
+        : Math.abs((firstRect.top + firstRect.height / 2) - currentY);
+      const secondPrimary = isHorizontal
+        ? Math.abs((secondRect.left + secondRect.width / 2) - currentX)
+        : Math.abs((secondRect.top + secondRect.height / 2) - currentY);
+      const firstSecondary = isHorizontal
+        ? Math.abs((firstRect.top + firstRect.height / 2) - currentY)
+        : Math.abs((firstRect.left + firstRect.width / 2) - currentX);
+      const secondSecondary = isHorizontal
+        ? Math.abs((secondRect.top + secondRect.height / 2) - currentY)
+        : Math.abs((secondRect.left + secondRect.width / 2) - currentX);
+      return (firstPrimary * 1000 + firstSecondary) - (secondPrimary * 1000 + secondSecondary);
+    })[0];
+
+    nextControl?.focus();
   };
 
   const handleQuotationModalKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -537,13 +566,25 @@ export default function AdminQuotationsPage() {
 
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      moveModalFocus(1);
+      moveModalFocus('down');
       return;
     }
 
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      moveModalFocus(-1);
+      moveModalFocus('up');
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      moveModalFocus('right');
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      moveModalFocus('left');
       return;
     }
 
@@ -552,7 +593,7 @@ export default function AdminQuotationsPage() {
     if (target instanceof HTMLButtonElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLInputElement && target.type === 'checkbox')) return;
 
     event.preventDefault();
-    moveModalFocus(1);
+    moveModalFocus('down');
   };
 
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
