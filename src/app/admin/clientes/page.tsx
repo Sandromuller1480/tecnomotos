@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { createCustomerAction, deleteCustomerAction } from './actions';
+import { createCustomerAction, deleteCustomerAction, updateCustomerAction } from './actions';
 import {
   User,
   Plus,
@@ -32,7 +32,7 @@ import {
 interface ProfileCustomer {
   id: string;
   full_name: string;
-  email: string;
+  email: string | null;
   phone: string;
   avatar_url?: string;
   status: string;
@@ -104,6 +104,7 @@ export default function AdminCustomersPage() {
 
   // Edit Customer Profile states
   const [eName, setEName] = useState('');
+  const [eEmail, setEEmail] = useState('');
   const [ePhone, setEPhone] = useState('');
   const [eDocument, setEDocument] = useState('');
   const [eBirthDate, setEBirthDate] = useState('');
@@ -121,6 +122,7 @@ export default function AdminCustomersPage() {
   const [addrState, setAddrState] = useState('');
   const [addrPostalCode, setAddrPostalCode] = useState('');
   const [addrIsDefault, setAddrIsDefault] = useState(false);
+  const [isLookingUpCep, setIsLookingUpCep] = useState(false);
 
   // Vehicle sub-states
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -235,8 +237,8 @@ export default function AdminCustomersPage() {
 
   const handleConfirmCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cName || !cEmail || !cPhone) {
-      error('Campos Obrigatórios', 'Nome, E-mail e Telefone são necessários.');
+    if (!cName || !cPhone) {
+      error('Campos Obrigatórios', 'Nome e Telefone são necessários.');
       return;
     }
 
@@ -280,6 +282,7 @@ export default function AdminCustomersPage() {
   const handleOpenDetails = async (cust: ProfileCustomer) => {
     setSelectedCustomer(cust);
     setEName(cust.full_name);
+    setEEmail(cust.email || '');
     setEPhone(cust.phone || '');
     setEDocument(cust.customers?.document || '');
     setEBirthDate(cust.customers?.birth_date || '');
@@ -320,28 +323,16 @@ export default function AdminCustomersPage() {
 
     setDetailSaving(true);
     try {
-      // Update profiles
-      const { error: profErr } = await supabase
-        .from('profiles')
-        .update({
-          full_name: eName,
-          phone: ePhone,
-          status: eStatus
-        })
-        .eq('id', selectedCustomer.id);
-
-      if (profErr) throw profErr;
-
-      // Update customers
-      const { error: custErr } = await supabase
-        .from('customers')
-        .update({
-          document: eDocument ? eDocument.replace(/\D/g, '') : null,
-          birth_date: eBirthDate || null
-        })
-        .eq('id', selectedCustomer.id);
-
-      if (custErr) throw custErr;
+      const result = await updateCustomerAction({
+        customerId: selectedCustomer.id,
+        fullName: eName,
+        email: eEmail,
+        phone: ePhone,
+        document: eDocument,
+        birthDate: eBirthDate,
+        status: eStatus
+      });
+      if (!result.success) throw new Error(result.error);
 
       const hasAddressData = addrStreet || addrNumber || addrComplement || addrNeighborhood || addrCity || addrState || addrPostalCode;
 
@@ -422,6 +413,30 @@ export default function AdminCustomersPage() {
     setAddrIsDefault(false);
     setEditingAddressId(null);
     setIsAddressFormOpen(false);
+  };
+
+  const handleAddressCepChange = async (value: string) => {
+    const cep = value.replace(/\D/g, '').slice(0, 8);
+    setAddrPostalCode(cep);
+    if (cep.length !== 8) return;
+
+    setIsLookingUpCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      if (!response.ok) throw new Error('Não foi possível consultar o CEP.');
+
+      const address = await response.json() as { localidade?: string; uf?: string; erro?: boolean };
+      if (address.erro || !address.localidade || !address.uf) {
+        throw new Error('CEP não encontrado.');
+      }
+
+      setAddrCity(address.localidade);
+      setAddrState(address.uf);
+    } catch (err) {
+      error('Erro ao consultar CEP', err instanceof Error ? err.message : 'Tente novamente.');
+    } finally {
+      setIsLookingUpCep(false);
+    }
   };
 
   const handleSaveAddress = async (e: React.FormEvent) => {
@@ -622,7 +637,7 @@ export default function AdminCustomersPage() {
     if (!query) return true;
     return (
       c.full_name.toLowerCase().includes(query) ||
-      c.email.toLowerCase().includes(query) ||
+      (c.email || '').toLowerCase().includes(query) ||
       (c.phone && c.phone.includes(query)) ||
       (c.customers?.document && c.customers.document.includes(query))
     );
@@ -692,7 +707,7 @@ export default function AdminCustomersPage() {
                     </div>
                     {c.full_name}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{c.email}</TableCell>
+                  <TableCell className="font-mono text-xs">{c.email || '-'}</TableCell>
                   <TableCell className="font-mono text-xs">{c.phone || '-'}</TableCell>
                   <TableCell className="font-mono text-xs">{c.customers?.document || '-'}</TableCell>
                   <TableCell>
@@ -874,13 +889,12 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">E-mail</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">E-mail (Opcional)</label>
                     <Input
                       type="email"
                       placeholder="Ex: carlos@email.com"
                       value={cEmail}
                       onChange={(e) => setCEmail(e.target.value)}
-                      required
                     />
                   </div>
                   <div className="space-y-1">
@@ -1077,10 +1091,12 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">E-mail (Não editável)</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">E-mail (Opcional)</label>
                     <Input
-                      value={selectedCustomer.email}
-                      disabled
+                      type="email"
+                      value={eEmail}
+                      onChange={(e) => setEEmail(e.target.value)}
+                      placeholder="Ex: carlos@email.com"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1174,11 +1190,13 @@ export default function AdminCustomersPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-brand-grey uppercase">CEP</label>
+                      <label className="text-[10px] font-mono text-brand-grey uppercase">CEP {isLookingUpCep && '(consultando...)'}</label>
                       <Input
                         placeholder="Somente numeros"
                         value={addrPostalCode}
-                        onChange={(e) => setAddrPostalCode(e.target.value)}
+                        onChange={(e) => void handleAddressCepChange(e.target.value)}
+                        inputMode="numeric"
+                        maxLength={8}
                       />
                     </div>
                   </div>
@@ -1281,8 +1299,8 @@ export default function AdminCustomersPage() {
                         <Input value={addrState} onChange={(e) => setAddrState(e.target.value)} required maxLength={2} />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-brand-grey uppercase">CEP</label>
-                        <Input value={addrPostalCode} onChange={(e) => setAddrPostalCode(e.target.value)} required />
+                        <label className="text-[10px] font-mono text-brand-grey uppercase">CEP {isLookingUpCep && '(consultando...)'}</label>
+                        <Input value={addrPostalCode} onChange={(e) => void handleAddressCepChange(e.target.value)} required inputMode="numeric" maxLength={8} />
                       </div>
                       <div className="flex items-center gap-2 pt-4">
                         <input
