@@ -91,6 +91,7 @@ export default function AdminCustomersPage() {
   const [cCity, setCCity] = useState('');
   const [cState, setCState] = useState('');
   const [cPostalCode, setCPostalCode] = useState('');
+  const [isLookingUpCreateCep, setIsLookingUpCreateCep] = useState(false);
 
   // Details/Edit Modal States
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -233,6 +234,30 @@ export default function AdminCustomersPage() {
     setCCity('');
     setCState('');
     setCPostalCode('');
+  };
+
+  const handleCreateCepChange = async (value: string) => {
+    const cep = value.replace(/\D/g, '').slice(0, 8);
+    setCPostalCode(cep);
+    if (cep.length !== 8) return;
+
+    setIsLookingUpCreateCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      if (!response.ok) throw new Error('Não foi possível consultar o CEP.');
+
+      const address = await response.json() as { localidade?: string; uf?: string; erro?: boolean };
+      if (address.erro || !address.localidade || !address.uf) {
+        throw new Error('CEP não encontrado.');
+      }
+
+      setCCity(address.localidade);
+      setCState(address.uf);
+    } catch (err) {
+      error('Erro ao consultar CEP', err instanceof Error ? err.message : 'Tente novamente.');
+    } finally {
+      setIsLookingUpCreateCep(false);
+    }
   };
 
   const handleConfirmCreate = async (e: React.FormEvent) => {
@@ -981,11 +1006,13 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">CEP</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">CEP {isLookingUpCreateCep && '(consultando...)'}</label>
                     <Input
                       placeholder="Somente números"
                       value={cPostalCode}
-                      onChange={(e) => setCPostalCode(e.target.value)}
+                      onChange={(e) => void handleCreateCepChange(e.target.value)}
+                      inputMode="numeric"
+                      maxLength={8}
                     />
                   </div>
                 </div>
