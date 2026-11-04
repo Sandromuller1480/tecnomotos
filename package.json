@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:fiscal": "npx tsx src/lib/services/fiscal/fiscal-tests.ts",
+    "test:fiscal": "tsc -p tsconfig.fiscal-tests.json && node tmp/fiscal-tests/services/fiscal/fiscal-tests.js",
     "test:stripe": "npx tsx src/lib/services/payment/stripe-tests.ts"
   },
   "dependencies": {

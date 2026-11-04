@@ -3,6 +3,8 @@ import { mapFiscalPaymentMethod } from './FiscalPaymentMapper';
 import { MockFiscalProvider } from './providers/MockFiscalProvider';
 import { validateNfceSale } from './validateNfceSale';
 import { FiscalCompanySettings, FiscalSale } from './types';
+import { FiscalResolutionError, FiscalRuleRecord, resolveFiscalItem } from '../../fiscal/rules/engine';
+import { isValidGtin } from '../../products/schema';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -49,6 +51,8 @@ async function runAllTests() {
         ncm: '87141000',
         cfop: '5102',
         csosn: '102',
+        fiscalRuleId: 'rule-internal-no-st',
+        fiscalRuleVersion: 1,
         origin: 0,
         unit: 'UN'
       }]
@@ -67,7 +71,37 @@ async function runAllTests() {
       'Produto sem NCM deve bloquear emissao'
     );
 
-    console.log('\n3. Validando provider mock...');
+    console.log('\n3. Validando motor de regras por item...');
+    const approvedRule: FiscalRuleRecord = {
+      id: 'rule-internal-no-st', name: 'Interna sem ST aprovada para teste', version: 1, status: 'approved',
+      companyCrt: '1', fiscalProfileId: 'profile-no-st', operationType: 'sale', documentModel: '65',
+      originScope: 'internal', destinationScope: 'internal', taxpayerIndicator: 'non_contributor',
+      purchasePurpose: 'final_consumption', cfop: '5102', csosn: '102', validFrom: '2026-01-01',
+      approvedBy: 'fixture-accountant', approvedAt: '2026-01-01T00:00:00.000Z', source: 'fixture de teste controlada'
+    };
+    const product = { id: 'p1', sku: 'TESTE-1', name: 'Produto teste', fiscalStatus: 'complete' as const, fiscalProfileId: 'profile-no-st', ncm: '87141000', origin: 0, unit: 'UN', withoutGtin: true };
+    const context = { companyCrt: '1', issuerUf: 'MT', destinationUf: 'MT', destinationScope: 'internal' as const, taxpayerIndicator: 'non_contributor' as const, purchasePurpose: 'final_consumption' as const, operationType: 'sale' as const, documentModel: '65' as const, occurredAt: new Date('2026-11-04T12:00:00Z') };
+    assert(resolveFiscalItem(context, product, [approvedRule]).cfop === '5102', 'Regra interna aprovada deve resolver 5102/102');
+
+    let pendingBlocked = false;
+    try { resolveFiscalItem(context, { ...product, fiscalStatus: 'pending', fiscalProfileId: null }, [approvedRule]); } catch (error) { pendingBlocked = error instanceof FiscalResolutionError && error.code === 'PRODUCT_PENDING'; }
+    assert(pendingBlocked, 'Produto sem perfil aprovado deve permanecer pendente e bloquear emissão');
+
+    let conflictBlocked = false;
+    try { resolveFiscalItem(context, product, [approvedRule, { ...approvedRule, id: 'rule-conflict', name: 'Conflito' }]); } catch (error) { conflictBlocked = error instanceof FiscalResolutionError && error.code === 'CONFLICTING_RULES'; }
+    assert(conflictBlocked, 'Duas regras aprovadas devem bloquear por conflito');
+
+    let expiredBlocked = false;
+    try { resolveFiscalItem(context, product, [{ ...approvedRule, validTo: '2026-01-31' }]); } catch (error) { expiredBlocked = error instanceof FiscalResolutionError && error.code === 'NO_RULE'; }
+    assert(expiredBlocked, 'Regra vencida não deve ser aplicada');
+
+    let interstateNonContributorBlocked = false;
+    try { resolveFiscalItem({ ...context, destinationUf: 'GO', destinationScope: 'interstate', documentModel: '55' }, product, [approvedRule]); } catch (error) { interstateNonContributorBlocked = error instanceof FiscalResolutionError && error.code === 'NO_RULE'; }
+    assert(interstateNonContributorBlocked, 'Não contribuinte interestadual não deve cair silenciosamente em 6102');
+    assert(isValidGtin('7898357417892'), 'GTIN-13 válido deve passar no dígito verificador');
+    assert(!isValidGtin('7898357417893'), 'GTIN com dígito verificador inválido deve falhar');
+
+    console.log('\n4. Validando provider mock...');
     const mockProvider = new MockFiscalProvider();
     const result = await mockProvider.issueNfce({
       operationId: '12345678-1234-1234-1234-123456789012',
@@ -79,7 +113,7 @@ async function runAllTests() {
     assert(result.status === 'authorized', 'MockFiscalProvider deve autorizar sem chamada externa');
     assert(String(result.accessKey).startsWith('MOCK-NFCE-'), 'Mock nao deve gerar chave fiscal real');
 
-    console.log('\n4. Validando factory e bloqueio de producao...');
+    console.log('\n5. Validando factory e bloqueio de producao...');
     const config = getFiscalRuntimeConfig();
     assert(config.provider === 'mock', 'FISCAL_PROVIDER deve permanecer mock por padrao de teste');
     assert(createFiscalProvider().name === 'mock', 'Factory deve criar MockFiscalProvider em modo mock');

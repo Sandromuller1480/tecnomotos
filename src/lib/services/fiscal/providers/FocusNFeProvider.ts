@@ -46,6 +46,24 @@ export class FocusNFeProvider implements FiscalProvider {
     return this.mapFocusResponse(response);
   }
 
+  async issueNfe(input: NfceIssueInput): Promise<ProviderFiscalResult> {
+    const response = await this.request(`/v2/nfe?ref=${encodeURIComponent(input.reference)}&completa=1`, {
+      method: 'POST', body: JSON.stringify(this.buildNfcePayload(input))
+    });
+    return this.mapFocusResponse(response);
+  }
+
+  async getNfe(reference: string): Promise<ProviderFiscalResult> {
+    const response = await this.request(`/v2/nfe/${encodeURIComponent(reference)}?completa=1`, { method: 'GET' });
+    return this.mapFocusResponse(response);
+  }
+
+  async cancelNfe(reference: string, reason: string): Promise<ProviderFiscalResult> {
+    if (reason.length < 15 || reason.length > 255) throw new Error('A justificativa de cancelamento deve ter entre 15 e 255 caracteres.');
+    const response = await this.request(`/v2/nfe/${encodeURIComponent(reference)}`, { method: 'DELETE', body: JSON.stringify({ justificativa: reason }) });
+    return this.mapFocusResponse(response);
+  }
+
   async issueNfse(_input: NfseIssueInput): Promise<ProviderFiscalResult> {
     throw new Error('Emissão de NFS-e pela Focus NFe ainda não está habilitada.');
   }
@@ -137,15 +155,17 @@ export class FocusNFeProvider implements FiscalProvider {
     return {
       cnpj_emitente: digitsOnly(input.company.cnpj),
       data_emissao: new Date().toISOString(),
-      indicador_inscricao_estadual_destinatario: '9',
+      indicador_inscricao_estadual_destinatario: input.sale.taxpayerIndicator === 'contributor' ? '1' : input.sale.taxpayerIndicator === 'exempt' ? '2' : '9',
       modalidade_frete: '9',
-      local_destino: '1',
+      local_destino: input.sale.destinationUf === input.company.uf ? '1' : '2',
+      consumidor_final: input.sale.purchasePurpose === 'final_consumption' ? '1' : '0',
       presenca_comprador: '1',
       natureza_operacao: 'VENDA AO CONSUMIDOR',
       nome_destinatario: input.sale.customerName || undefined,
       cpf_destinatario: isCpf ? customerDocument : undefined,
       cnpj_destinatario: isCnpj ? customerDocument : undefined,
-      serie: input.company.nfceSeries || undefined,
+      serie: input.sale.documentModel === '55' ? input.company.nfeSeries || undefined : input.company.nfceSeries || undefined,
+      uf_destinatario: input.sale.destinationUf || undefined,
       items: input.sale.items.map((item, index) => ({
         numero_item: String(index + 1),
         codigo_produto: item.sku || item.productId || item.id,
@@ -160,8 +180,8 @@ export class FocusNFeProvider implements FiscalProvider {
         unidade_tributavel: item.unit,
         quantidade_tributavel: item.quantity,
         valor_unitario_tributavel: item.unitPrice,
-        gtin: item.gtin || undefined,
-        gtin_tributavel: item.gtin || undefined,
+        codigo_barras_comercial: item.gtin || undefined,
+        codigo_barras_tributavel: item.gtin || undefined,
         origem: item.origin,
         cst_icms: item.cst || undefined,
         csosn: item.csosn || undefined

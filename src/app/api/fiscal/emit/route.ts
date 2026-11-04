@@ -22,18 +22,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { orderId, customerName, customerDocument, paymentMethod } = body;
+    const { orderId } = body;
 
     if (!orderId) {
       return NextResponse.json({ error: 'Pedido obrigatório para emissão fiscal.' }, { status: 400 });
     }
 
     const fiscalService = new FiscalOperationService(createAdminClient());
-    const result = await fiscalService.issueNfce(orderId, {
-      customerName,
-      customerDocument,
-      paymentMethod: paymentMethod || 'other'
-    });
+    // Product tax codes and recipient context are loaded from the database.
+    // Values sent by the browser are intentionally not fiscal authority.
+    const result = await fiscalService.issueNfce(orderId);
 
     return NextResponse.json({
       success: true,

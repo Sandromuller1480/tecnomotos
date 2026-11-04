@@ -19,6 +19,7 @@ import {
   FileText,
   Settings,
   Briefcase,
+  Landmark,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
@@ -114,10 +115,12 @@ export function Sidebar({ userRole = 'CUSTOMER', userPermissions = [], employeeF
         { label: 'Funcionários', href: '/admin/funcionarios', icon: Briefcase, permission: 'employees.view' },
       ],
     },
+    { items: [{ label: 'Relatórios', href: '/admin/relatorios', icon: FileText, permission: 'reports.view' }] },
     {
+      title: 'Configurações',
       items: [
-        { label: 'Relatórios', href: '/admin/relatorios', icon: FileText, permission: 'reports.view' },
-        { label: 'Configurações', href: '/admin/configuracoes', icon: Settings, permission: 'settings.view' },
+        { label: 'Geral', href: '/admin/configuracoes', exact: true, icon: Settings, permission: 'settings.view' },
+        { label: 'Fiscal', href: '/admin/configuracoes/fiscal', icon: Landmark, permission: 'fiscal.view' },
       ],
     },
   ];

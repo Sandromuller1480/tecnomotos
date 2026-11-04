@@ -1,6 +1,6 @@
 'use client';
 
-import React, { ReactNode, useEffect } from 'react';
+import React, { ReactNode, useEffect, useId } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils/cn';
@@ -22,6 +22,7 @@ export function Modal({
   footer,
   size = 'md',
 }: ModalProps) {
+  const titleId = useId();
   // Prevent body scrolling when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -34,13 +35,22 @@ export function Modal({
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const sizes = {
     sm: 'max-w-sm',
     md: 'max-w-md',
     lg: 'max-w-lg',
-    xl: 'max-w-2xl',
+    xl: 'max-w-4xl',
   };
 
   return (
@@ -53,6 +63,9 @@ export function Modal({
 
       {/* Modal Content container */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={cn(
           'relative w-full bg-brand-card border border-brand-grey/25 p-6 shadow-2xl animate-zoom-in text-left text-white overflow-hidden skew-x-[-2deg]',
           sizes[size]
@@ -62,10 +75,12 @@ export function Modal({
         <div className="skew-x-[2deg]">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-brand-grey/20 pb-4 mb-4">
-            <h3 className="text-base font-bold font-mono uppercase tracking-widest text-white border-l-4 border-l-brand-red pl-2">
+            <h3 id={titleId} className="text-base font-bold font-mono uppercase tracking-widest text-white border-l-4 border-l-brand-red pl-2">
               {title}
             </h3>
             <button
+              type="button"
+              aria-label="Fechar modal"
               onClick={onClose}
               className="text-brand-grey hover:text-white transition-colors cursor-pointer"
             >

@@ -63,6 +63,9 @@ export default function CustomerDashboard() {
   const [phone, setPhone] = useState('');
   const [document, setDocument] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  const [stateRegistration, setStateRegistration] = useState('');
+  const [taxpayerIndicator, setTaxpayerIndicator] = useState('');
+  const [purchasePurpose, setPurchasePurpose] = useState('');
   const [isSavingInfo, setIsSavingInfo] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
 
@@ -101,7 +104,10 @@ export default function CustomerDashboard() {
           phone,
           customers (
             document,
-            birth_date
+            birth_date,
+            state_registration,
+            icms_taxpayer_indicator,
+            purchase_purpose
           )
         `)
         .eq('id', uid)
@@ -114,6 +120,9 @@ export default function CustomerDashboard() {
         if (custData) {
           setDocument(custData.document || '');
           setBirthDate(custData.birth_date || '');
+          setStateRegistration(custData.state_registration || '');
+          setTaxpayerIndicator(custData.icms_taxpayer_indicator || '');
+          setPurchasePurpose(custData.purchase_purpose || '');
         }
       }
 
@@ -184,7 +193,10 @@ export default function CustomerDashboard() {
         .from('customers')
         .update({
           document: document ? document.replace(/\D/g, '') : null,
-          birth_date: birthDate || null
+          birth_date: birthDate || null,
+          state_registration: stateRegistration.trim() || null,
+          icms_taxpayer_indicator: taxpayerIndicator || null,
+          purchase_purpose: purchasePurpose || null
         })
         .eq('id', userId);
 
@@ -527,6 +539,22 @@ export default function CustomerDashboard() {
                             value={birthDate}
                             onChange={(e) => setBirthDate(e.target.value)}
                           />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-mono text-brand-grey uppercase">Situação perante o ICMS</label>
+                          <select value={taxpayerIndicator} onChange={(e) => setTaxpayerIndicator(e.target.value)} className="w-full border border-brand-grey/20 bg-brand-darkgrey px-4 py-2.5 text-sm text-white focus:border-brand-red focus:outline-none">
+                            <option value="">Selecione</option><option value="contributor">Contribuinte</option><option value="exempt">Isento</option><option value="non_contributor">Não contribuinte</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-mono text-brand-grey uppercase">Inscrição Estadual</label>
+                          <Input value={stateRegistration} onChange={(e) => setStateRegistration(e.target.value)} placeholder="Quando aplicável" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-mono text-brand-grey uppercase">Finalidade habitual da compra</label>
+                          <select value={purchasePurpose} onChange={(e) => setPurchasePurpose(e.target.value)} className="w-full border border-brand-grey/20 bg-brand-darkgrey px-4 py-2.5 text-sm text-white focus:border-brand-red focus:outline-none">
+                            <option value="">Selecione</option><option value="final_consumption">Consumo final</option><option value="resale">Revenda</option>
+                          </select>
                         </div>
                       </div>
 

@@ -47,6 +47,23 @@ export class MockFiscalProvider implements FiscalProvider {
     };
   }
 
+  async issueNfe(input: NfceIssueInput): Promise<ProviderFiscalResult> {
+    const sequence = input.operationId.slice(0, 8).toUpperCase();
+    return {
+      status: 'processing', providerStatus: 'mock_processing', providerDocumentId: `MOCK-NFE-${sequence}`,
+      number: `MOCK-${sequence}`, series: input.company.nfeSeries || '1',
+      raw: { reference: input.reference, provider: this.name, itemCount: input.sale.items.length }
+    };
+  }
+
+  async getNfe(reference: string): Promise<ProviderFiscalResult> {
+    return { status: 'authorized', providerStatus: 'mock_authorized', accessKey: `MOCK-NFE-${reference.slice(-8)}`, protocol: `MOCK-PROTOCOL-${reference.slice(-8)}`, authorizedAt: new Date().toISOString() };
+  }
+
+  async cancelNfe(reference: string, reason: string): Promise<ProviderFiscalResult> {
+    return { status: 'cancelled', providerStatus: 'mock_cancelled', protocol: `MOCK-CANCEL-${reference.slice(-8)}`, cancelledAt: new Date().toISOString(), raw: { reasonLength: reason.length } };
+  }
+
   async issueNfse(input: NfseIssueInput): Promise<ProviderFiscalResult> {
     const sequence = input.serviceOrder.id.slice(0, 8).toUpperCase();
 

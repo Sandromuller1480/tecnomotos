@@ -34,8 +34,9 @@ export function validateNfceSale(company: FiscalCompanySettings, sale: FiscalSal
     if (!item.quantity || item.quantity <= 0) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} esta com quantidade invalida.`);
     if (item.unitPrice < 0) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} esta com valor invalido.`);
     if (!item.ncm) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui NCM cadastrado.`);
-    if (!item.cfop) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui CFOP cadastrado.`);
-    if (!item.cst && !item.csosn) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui CST/CSOSN cadastrado.`);
+    if (!item.cfop) errors.push(`Nao foi possivel preparar a nota porque nenhuma regra aprovada resolveu o CFOP do produto ${label}.`);
+    if (!item.cst && !item.csosn) errors.push(`Nao foi possivel preparar a nota porque nenhuma regra aprovada resolveu o CST/CSOSN do produto ${label}.`);
+    if (!item.fiscalRuleId || !item.fiscalRuleVersion) errors.push(`Nao foi possivel preparar a nota porque o produto ${label} nao possui snapshot de regra fiscal.`);
     if (item.origin === null || item.origin === undefined) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui origem fiscal cadastrada.`);
     if (!item.unit) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui unidade fiscal cadastrada.`);
   });

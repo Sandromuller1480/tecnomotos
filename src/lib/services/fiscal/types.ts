@@ -11,6 +11,7 @@ export interface FiscalCompanySettings {
   ibgeCityCode?: string | null;
   crt?: string | null;
   nfceSeries?: string | null;
+  nfeSeries?: string | null;
 }
 
 export interface FiscalSaleItem {
@@ -28,6 +29,12 @@ export interface FiscalSaleItem {
   origin?: number | null;
   unit?: string | null;
   gtin?: string | null;
+  withoutGtin?: boolean;
+  fiscalStatus?: 'pending' | 'review_required' | 'complete';
+  fiscalProfileId?: string | null;
+  fiscalRuleId?: string | null;
+  fiscalRuleVersion?: number | null;
+  taxParameters?: Record<string, unknown>;
 }
 
 export interface FiscalSale {
@@ -37,6 +44,10 @@ export interface FiscalSale {
   customerEmail?: string | null;
   totalAmount: number;
   paymentMethod: string;
+  documentModel?: '55' | '65';
+  destinationUf?: string | null;
+  taxpayerIndicator?: 'contributor' | 'exempt' | 'non_contributor' | null;
+  purchasePurpose?: 'resale' | 'final_consumption' | null;
   items: FiscalSaleItem[];
 }
 
@@ -87,6 +98,9 @@ export interface FiscalProvider {
   issueNfce(input: NfceIssueInput): Promise<ProviderFiscalResult>;
   getNfce(reference: string): Promise<ProviderFiscalResult>;
   cancelNfce(reference: string, reason: string): Promise<ProviderFiscalResult>;
+  issueNfe(input: NfceIssueInput): Promise<ProviderFiscalResult>;
+  getNfe(reference: string): Promise<ProviderFiscalResult>;
+  cancelNfe(reference: string, reason: string): Promise<ProviderFiscalResult>;
   issueNfse(input: NfseIssueInput): Promise<ProviderFiscalResult>;
   getNfse(reference: string): Promise<ProviderFiscalResult>;
   cancelNfse(reference: string, reason: string): Promise<ProviderFiscalResult>;

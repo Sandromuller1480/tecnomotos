@@ -1,7 +1,9 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
 import { createFiscalProvider, getFiscalRuntimeConfig } from './FiscalProviderFactory';
 import { validateNfceSale } from './validateNfceSale';
 import { FiscalCompanySettings, FiscalDocumentStatus, FiscalSale, FiscalServiceOrder, ProviderFiscalResult } from './types';
+import { determineDocumentModel, FiscalResolutionContext, FiscalRuleRecord, resolveFiscalItem } from '@/lib/fiscal/rules/engine';
 
 type DatabaseClient = SupabaseClient<any, 'public', any>;
 
@@ -18,30 +20,35 @@ export class FiscalOperationService {
       return { document: existing, reused: true };
     }
 
-    const sale = await this.loadSale(orderId, fallback);
+    let sale = await this.loadSale(orderId, fallback);
     const company = await this.loadCompanySettings();
+    sale = await this.resolveSaleItems(sale, company);
     const validationErrors = validateNfceSale(company, sale);
 
     if (validationErrors.length > 0) {
       throw new Error(validationErrors[0]);
     }
 
-    const operation = await this.claimOperation(orderId, config.provider, config.environment);
+    await this.saveFiscalPreview(orderId, sale);
+
+    const operation = await this.claimOperation(orderId, config.provider, config.environment, sale.documentModel!);
     await this.updateOperation(operation.id, 'processing');
     await this.log('fiscal.issue.start', null, operation.reference, 'processing', 'Emissao NFC-e iniciada.');
 
     const provider = createFiscalProvider();
 
     try {
-      const result = await provider.issueNfce({
+      const issueInput = {
         operationId: operation.id,
         reference: operation.reference,
         environment: config.environment,
         company,
         sale
-      });
+      };
+      const result = sale.documentModel === '55' ? await provider.issueNfe(issueInput) : await provider.issueNfce(issueInput);
 
       const document = await this.saveDocument(operation.id, orderId, operation.reference, result, company, sale);
+      await this.db.from('fiscal_previews').update({ status: 'used' }).eq('sale_id', orderId).eq('status', 'ready');
       await this.updateOperation(operation.id, result.status, result.errorMessage);
       await this.log(
         result.status === 'authorized' ? 'fiscal.issue.success' : 'fiscal.issue.rejected',
@@ -55,6 +62,19 @@ export class FiscalOperationService {
       return { document, reused: false };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao emitir NFC-e.';
+      try {
+        const reconciled = sale.documentModel === '55'
+          ? await provider.getNfe(operation.reference)
+          : await provider.getNfce(operation.reference);
+        if (['processing', 'authorized', 'rejected', 'cancelled'].includes(reconciled.status)) {
+          const document = await this.saveDocument(operation.id, orderId, operation.reference, reconciled, company, sale);
+          await this.updateOperation(operation.id, reconciled.status, reconciled.errorMessage);
+          await this.log('fiscal.issue.reconciled', document.id, operation.reference, reconciled.status, 'Emissão reconciliada por consulta após falha de comunicação.', reconciled);
+          return { document, reused: true };
+        }
+      } catch {
+        // A failed reconciliation keeps the stable operation reference available for a later retry.
+      }
       await this.updateOperation(operation.id, 'error', message);
       await this.log('fiscal.issue.error', null, operation.reference, 'error', message);
       throw error;
@@ -113,10 +133,9 @@ export class FiscalOperationService {
 
     const provider = createFiscalProvider();
     const isNfse = document.document_type === 'NFSE';
+    const isNfe = document.document_type === 'NFE';
     await this.log('fiscal.query.start', document.id, document.reference, document.status, `Consulta ${isNfse ? 'NFS-e' : 'NFC-e'} iniciada.`);
-    const result = isNfse
-      ? await provider.getNfse(document.reference)
-      : await provider.getNfce(document.reference);
+    const result = isNfse ? await provider.getNfse(document.reference) : isNfe ? await provider.getNfe(document.reference) : await provider.getNfce(document.reference);
     const updated = await this.applyProviderResult(document.id, result);
 
     if (document.fiscal_operation_id) {
@@ -149,10 +168,9 @@ export class FiscalOperationService {
 
     const provider = createFiscalProvider();
     const isNfse = document.document_type === 'NFSE';
+    const isNfe = document.document_type === 'NFE';
     await this.log('fiscal.cancel.start', document.id, document.reference, document.status, `Cancelamento ${isNfse ? 'NFS-e' : 'NFC-e'} iniciado.`);
-    const result = isNfse
-      ? await provider.cancelNfse(document.reference, reason)
-      : await provider.cancelNfce(document.reference, reason);
+    const result = isNfse ? await provider.cancelNfse(document.reference, reason) : isNfe ? await provider.cancelNfe(document.reference, reason) : await provider.cancelNfce(document.reference, reason);
     const updated = await this.applyProviderResult(document.id, result);
 
     if (document.fiscal_operation_id) {
@@ -172,7 +190,8 @@ export class FiscalOperationService {
       .single();
 
     if (insertError) {
-      return { duplicate: true };
+      if (insertError.code === '23505') return { duplicate: true };
+      throw insertError;
     }
 
     const { data: document } = await this.db
@@ -189,7 +208,18 @@ export class FiscalOperationService {
       return { duplicate: false, processed: false };
     }
 
+    const runtime = getFiscalRuntimeConfig();
+    const payloadCnpj = digitsOnly(String(payload.cnpj_emitente || ''));
+    if (document.environment !== runtime.environment || (payloadCnpj && payloadCnpj !== digitsOnly(document.issuer_cnpj))) {
+      await this.db.from('fiscal_webhook_events').update({ status: 'error', error_message: 'Empresa ou ambiente divergente.', processed_at: new Date().toISOString() }).eq('id', inserted.id);
+      return { duplicate: false, processed: false };
+    }
+
     const providerResult = this.mapWebhookPayload(payload);
+    if (!this.canApplyWebhookStatus(document.status, providerResult.status)) {
+      await this.db.from('fiscal_webhook_events').update({ status: 'processed', processed_at: new Date().toISOString() }).eq('id', inserted.id);
+      return { duplicate: false, processed: true, ignoredOutOfOrder: true, document };
+    }
     const updated = await this.applyProviderResult(document.id, providerResult);
 
     await this.db
@@ -213,7 +243,8 @@ export class FiscalOperationService {
       city: data?.city || 'Tangara da Serra',
       ibgeCityCode: data?.ibge_city_code || '5107958',
       crt: data?.crt || process.env.FISCAL_CRT || null,
-      nfceSeries: data?.nfce_series || process.env.FISCAL_NFCE_SERIES || null
+      nfceSeries: data?.nfce_series || process.env.FISCAL_NFCE_SERIES || null,
+      nfeSeries: data?.nfe_series || process.env.FISCAL_NFE_SERIES || null
     };
   }
 
@@ -224,6 +255,11 @@ export class FiscalOperationService {
         id,
         customer_email,
         customer_id,
+        customer_name,
+        payment_method,
+        delivery_address_id,
+        delivery_mode,
+        purchase_purpose,
         total_amount,
         status,
         order_items (
@@ -245,6 +281,9 @@ export class FiscalOperationService {
             fiscal_origin,
             unit,
             taxable_unit
+            ,without_gtin
+            ,fiscal_status
+            ,fiscal_tax_profile_id
           )
         )
       `)
@@ -253,6 +292,18 @@ export class FiscalOperationService {
 
     if (error || !order) throw new Error('Venda nao encontrada para emissao fiscal.');
     if (order.status !== 'paid') throw new Error('A NFC-e so pode ser emitida para pedido com pagamento aprovado.');
+
+    let customer: any = null;
+    let address: any = null;
+    if (order.customer_id) {
+      const customerResult = await this.db.from('customers').select('document, state_registration, icms_taxpayer_indicator, purchase_purpose').eq('id', order.customer_id).maybeSingle();
+      customer = customerResult.data;
+      const addressQuery = this.db.from('customer_addresses').select('state').eq('customer_id', order.customer_id);
+      const addressResult = order.delivery_address_id
+        ? await addressQuery.eq('id', order.delivery_address_id).maybeSingle()
+        : await addressQuery.eq('is_default', true).maybeSingle();
+      address = addressResult.data;
+    }
 
     const items = (order.order_items || []).map((item: any) => {
       const product = Array.isArray(item.products) ? item.products[0] : item.products;
@@ -271,17 +322,61 @@ export class FiscalOperationService {
         origin: product?.fiscal_origin ?? product?.origin,
         unit: product?.taxable_unit || product?.unit,
         gtin: product?.gtin || product?.barcode
+        ,withoutGtin: product?.without_gtin
+        ,fiscalStatus: product?.fiscal_status || 'pending'
+        ,fiscalProfileId: product?.fiscal_tax_profile_id
       };
     });
 
     return {
       id: order.id,
       customerEmail: order.customer_email,
-      customerName: fallback?.customerName || order.customer_email,
-      customerDocument: fallback?.customerDocument || null,
+      customerName: fallback?.customerName || order.customer_name || order.customer_email,
+      customerDocument: customer?.document || fallback?.customerDocument || null,
       totalAmount: Number(order.total_amount) || 0,
-      paymentMethod: fallback?.paymentMethod || 'other',
+      paymentMethod: order.payment_method || fallback?.paymentMethod || 'other',
+      destinationUf: address?.state || (order.delivery_mode === 'pickup' ? process.env.FISCAL_UF || 'MT' : null),
+      taxpayerIndicator: customer?.icms_taxpayer_indicator || null,
+      purchasePurpose: order.purchase_purpose || customer?.purchase_purpose || null,
       items
+    };
+  }
+
+  private async resolveSaleItems(sale: FiscalSale, company: FiscalCompanySettings): Promise<FiscalSale> {
+    if (!sale.destinationUf) throw new Error('Informe o destino efetivo da mercadoria antes de preparar a nota.');
+    if (!sale.taxpayerIndicator) throw new Error('Confirme a situação de contribuinte do ICMS do cliente.');
+    if (!sale.purchasePurpose) throw new Error('Informe se a compra é para revenda ou consumo final.');
+    const destinationScope = sale.destinationUf.toUpperCase() === company.uf.toUpperCase() ? 'internal' : 'interstate';
+    const documentModel = determineDocumentModel({
+      destinationScope,
+      nfceEligible: destinationScope === 'internal' && sale.taxpayerIndicator === 'non_contributor' && sale.purchasePurpose === 'final_consumption'
+    });
+    const { data, error } = await this.db.from('fiscal_rules').select('*').eq('status', 'approved');
+    if (error) throw new Error(`Não foi possível carregar as regras fiscais: ${error.message}`);
+    const rules: FiscalRuleRecord[] = (data || []).map((rule: any) => ({
+      id: rule.id, name: rule.name, version: rule.version, status: rule.status, companyCrt: rule.company_crt,
+      fiscalProfileId: rule.fiscal_profile_id, operationType: rule.operation_type, documentModel: rule.document_model,
+      originScope: rule.origin_scope, destinationScope: rule.destination_scope, destinationUf: rule.destination_uf,
+      taxpayerIndicator: rule.taxpayer_indicator, purchasePurpose: rule.purchase_purpose, cfop: rule.cfop,
+      csosn: rule.csosn, cstIcms: rule.cst_icms, taxParameters: rule.tax_parameters,
+      validFrom: rule.valid_from, validTo: rule.valid_to, approvedBy: rule.approved_by, approvedAt: rule.approved_at, source: rule.source
+    }));
+    const context: FiscalResolutionContext = {
+      companyCrt: company.crt || '', issuerUf: company.uf, destinationUf: sale.destinationUf.toUpperCase(),
+      destinationScope, taxpayerIndicator: sale.taxpayerIndicator, purchasePurpose: sale.purchasePurpose,
+      operationType: 'sale', documentModel, occurredAt: new Date()
+    };
+    return {
+      ...sale,
+      documentModel,
+      items: sale.items.map((item) => {
+        const resolved = resolveFiscalItem(context, {
+          id: item.productId || item.id, sku: item.sku, name: item.name, fiscalStatus: item.fiscalStatus || 'pending',
+          fiscalProfileId: item.fiscalProfileId, ncm: item.ncm, cest: item.cest, origin: item.origin,
+          unit: item.unit, gtin: item.gtin, withoutGtin: item.withoutGtin
+        }, rules);
+        return { ...item, cfop: resolved.cfop, csosn: resolved.csosn, cst: resolved.cstIcms, fiscalRuleId: resolved.ruleId, fiscalRuleVersion: resolved.ruleVersion, taxParameters: resolved.taxParameters };
+      })
     };
   }
 
@@ -349,14 +444,16 @@ export class FiscalOperationService {
     return data;
   }
 
-  private async claimOperation(orderId: string, provider: string, environment: string) {
+  private async claimOperation(orderId: string, provider: string, environment: string, model: '55' | '65') {
+    const documentType = model === '55' ? 'NFE' : 'NFCE';
     const existing = await this.db
       .from('fiscal_operations')
       .select('*')
       .eq('sale_id', orderId)
       .eq('operation_type', 'issue')
-      .eq('document_type', 'NFCE')
-      .in('status', ['pending', 'processing', 'authorized', 'contingency'])
+      .eq('document_type', documentType)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (existing.data) return existing.data;
@@ -366,8 +463,8 @@ export class FiscalOperationService {
       .insert({
         sale_id: orderId,
         operation_type: 'issue',
-        document_type: 'NFCE',
-        reference: `tecnomotos-nfce-${orderId}`,
+        document_type: documentType,
+        reference: `tecnomotos-${documentType.toLowerCase()}-${orderId}`,
         provider,
         environment,
         status: 'pending'
@@ -381,7 +478,7 @@ export class FiscalOperationService {
         .select('*')
         .eq('sale_id', orderId)
         .eq('operation_type', 'issue')
-        .eq('document_type', 'NFCE')
+        .eq('document_type', documentType)
         .single();
 
       if (retry.data) return retry.data;
@@ -404,8 +501,8 @@ export class FiscalOperationService {
       order_id: orderId,
       sale_id: orderId,
       provider: getFiscalRuntimeConfig().provider,
-      document_type: 'NFCE',
-      model: '65',
+      document_type: sale.documentModel === '55' ? 'NFE' : 'NFCE',
+      model: sale.documentModel || '65',
       environment: getFiscalRuntimeConfig().environment,
       reference,
       status: result.status,
@@ -435,6 +532,46 @@ export class FiscalOperationService {
       .single();
 
     if (error) throw error;
+    await this.saveDocumentItems(data.id, sale);
+    return data;
+  }
+
+  private async saveDocumentItems(documentId: string, sale: FiscalSale) {
+    const rows = sale.items.map((item, index) => ({
+      fiscal_document_id: documentId, order_item_id: item.id, product_id: item.productId || null,
+      fiscal_rule_id: item.fiscalRuleId, rule_version: item.fiscalRuleVersion,
+      item_number: index + 1, product_snapshot: { id: item.productId, sku: item.sku, name: item.name, ncm: item.ncm, cest: item.cest, origin: item.origin, unit: item.unit, gtin: item.gtin },
+      fiscal_snapshot: { cfop: item.cfop, csosn: item.csosn, cstIcms: item.cst, taxParameters: item.taxParameters },
+      quantity: item.quantity, unit_price: item.unitPrice, total_amount: Number((item.quantity * item.unitPrice).toFixed(2)),
+      cfop: item.cfop, csosn: item.csosn || null, cst_icms: item.cst || null
+    }));
+    const { error } = await this.db.from('fiscal_document_items').upsert(rows, { onConflict: 'fiscal_document_id,item_number' });
+    if (error) throw error;
+  }
+
+  private async saveFiscalPreview(orderId: string, sale: FiscalSale) {
+    const contextSnapshot = {
+      destinationUf: sale.destinationUf, taxpayerIndicator: sale.taxpayerIndicator,
+      purchasePurpose: sale.purchasePurpose, documentModel: sale.documentModel,
+      totalAmount: sale.totalAmount, items: sale.items.map((item) => ({
+        id: item.id, productId: item.productId, quantity: item.quantity, unitPrice: item.unitPrice,
+        ncm: item.ncm, origin: item.origin, unit: item.unit, fiscalRuleId: item.fiscalRuleId, fiscalRuleVersion: item.fiscalRuleVersion
+      }))
+    };
+    const contextHash = createHash('sha256').update(JSON.stringify(contextSnapshot)).digest('hex');
+    const { data: current } = await this.db.from('fiscal_previews').select('id,context_hash').eq('sale_id', orderId).eq('status', 'ready');
+    const same = (current || []).find((preview: any) => preview.context_hash === contextHash);
+    if (same) return same;
+    if (current?.length) {
+      await this.db.from('fiscal_previews').update({ status: 'invalidated', invalidated_at: new Date().toISOString() }).eq('sale_id', orderId).eq('status', 'ready');
+    }
+    const { data, error } = await this.db.from('fiscal_previews').insert({
+      sale_id: orderId, context_hash: contextHash, document_model: sale.documentModel,
+      context_snapshot: contextSnapshot,
+      rules_snapshot: sale.items.map((item) => ({ itemId: item.id, ruleId: item.fiscalRuleId, ruleVersion: item.fiscalRuleVersion, cfop: item.cfop, csosn: item.csosn, cstIcms: item.cst }))
+    }).select().single();
+    if (error) throw error;
+    await this.db.from('orders').update({ fiscal_preview_hash: contextHash, fiscal_previewed_at: new Date().toISOString() }).eq('id', orderId);
     return data;
   }
 
@@ -554,5 +691,11 @@ export class FiscalOperationService {
       errorMessage: payload.mensagem ? String(payload.mensagem) : undefined,
       raw: payload
     };
+  }
+
+  private canApplyWebhookStatus(current: string, incoming: FiscalDocumentStatus) {
+    if (current === 'cancelled' || current === 'CANCELLED') return incoming === 'cancelled';
+    if (current === 'authorized' || current === 'EMITTED') return incoming === 'authorized' || incoming === 'cancelled' || incoming === 'rejected';
+    return true;
   }
 }
