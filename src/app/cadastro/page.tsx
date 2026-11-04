@@ -17,6 +17,10 @@ const registerSchema = z
     fullName: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres.'),
     email: z.string().email('Por favor, informe um e-mail válido.'),
     phone: z.string().min(8, 'Informe um telefone válido.'),
+    document: z.string().refine((value) => {
+      const digits = value.replace(/\D/g, '');
+      return digits.length === 11 || digits.length === 14;
+    }, 'Informe um CPF ou CNPJ válido.'),
     street: z.string().min(3, 'Informe a rua.'),
     number: z.string().min(1, 'Informe o número.'),
     complement: z.string().optional(),
@@ -40,6 +44,7 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [document, setDocument] = useState('');
   const [street, setStreet] = useState('');
   const [number, setNumber] = useState('');
   const [complement, setComplement] = useState('');
@@ -63,6 +68,7 @@ export default function RegisterPage() {
       fullName,
       email,
       phone,
+      document,
       street,
       number,
       complement,
@@ -94,6 +100,7 @@ export default function RegisterPage() {
           data: {
             full_name: fullName,
             phone: phone,
+            document: document.replace(/\D/g, ''),
             address_street: street,
             address_number: number,
             address_complement: complement,
@@ -181,6 +188,18 @@ export default function RegisterPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     error={formErrors.phone}
+                    disabled={isLoading}
+                    required
+                  />
+
+                  <Input
+                    label="CPF / CNPJ"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Somente números"
+                    value={document}
+                    onChange={(e) => setDocument(e.target.value)}
+                    error={formErrors.document}
                     disabled={isLoading}
                     required
                   />

@@ -28,13 +28,13 @@ export class StripePaymentService extends PaymentService {
    * Recalculates all prices on the server-side to prevent fraud.
    */
   async createCheckoutSession(
-    userId: string,
+    customerId: string,
     items: CartItem[],
     cancelUrl: string,
     successUrl: string,
     orderId?: string
   ): Promise<CheckoutSession> {
-    console.log(`[Stripe] Creating checkout session for user: ${userId} and order: ${orderId}`);
+    console.log(`[Stripe] Creating checkout session for customer: ${customerId} and order: ${orderId}`);
 
     const supabase = createAdminClient();
     
@@ -42,7 +42,7 @@ export class StripePaymentService extends PaymentService {
     const { data: profile } = await supabase
       .from('profiles')
       .select('email')
-      .eq('id', userId)
+      .eq('id', customerId)
       .single();
     
     const customerEmail = profile?.email || undefined;
@@ -101,7 +101,7 @@ export class StripePaymentService extends PaymentService {
       customer_email: customerEmail,
       metadata: {
         order_id: orderId || null,
-        customer_id: userId
+        customer_id: customerId
       }
     });
 

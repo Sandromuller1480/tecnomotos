@@ -163,9 +163,22 @@ export default function CustomerDashboard() {
         return;
       }
 
-      setUserId(user.id);
+      const { data: customerAccount, error: customerAccountError } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+
+      if (customerAccountError || !customerAccount) {
+        error('Cadastro não vinculado', 'Não foi possível localizar o cadastro comercial desta conta.');
+        await supabase.auth.signOut();
+        router.push('/login');
+        return;
+      }
+
+      setUserId(customerAccount.id);
       setEmail(user.email || '');
-      await loadCustomerData(user.id);
+      await loadCustomerData(customerAccount.id);
     }
 
     checkAuth();

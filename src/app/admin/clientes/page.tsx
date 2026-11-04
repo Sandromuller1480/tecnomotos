@@ -151,29 +151,16 @@ export default function AdminCustomersPage() {
           phone,
           avatar_url,
           status,
-          customers (
+          customers!inner (
             document,
             birth_date
-          ),
-          user_roles (
-            roles (
-              name
-            )
           )
         `)
         .order('full_name');
 
       if (fetchErr) throw fetchErr;
 
-      const formatted = (data || [])
-        .filter((item: any) => {
-          const userRoles = Array.isArray(item.user_roles) ? item.user_roles : [];
-          return !userRoles.some((userRole: any) => {
-            const role = Array.isArray(userRole.roles) ? userRole.roles[0] : userRole.roles;
-            return role?.name === 'OWNER';
-          });
-        })
-        .map((item: any) => ({
+      const formatted = (data || []).map((item: any) => ({
         id: item.id,
         full_name: item.full_name,
         email: item.email,

@@ -116,29 +116,15 @@ export default function AdminCrmPage() {
         full_name,
         email,
         phone,
-        customers (
+        customers!inner (
           document
-        ),
-        user_roles (
-          roles (
-            name
-          )
         )
       `)
       .order('full_name');
 
     if (fetchErr) throw fetchErr;
 
-    const formatted = (data || [])
-      .filter((item: any) => item.customers)
-      .filter((item: any) => {
-        const userRoles = Array.isArray(item.user_roles) ? item.user_roles : [];
-        return !userRoles.some((userRole: any) => {
-          const role = Array.isArray(userRole.roles) ? userRole.roles[0] : userRole.roles;
-          return role?.name === 'OWNER';
-        });
-      })
-      .map((item: any) => ({
+    const formatted = (data || []).map((item: any) => ({
         id: item.id,
         full_name: item.full_name,
         email: item.email,

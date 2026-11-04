@@ -38,9 +38,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Seu carrinho está vazio.' }, { status: 400 });
     }
 
+    const { data: customerId, error: customerIdError } = await supabase.rpc('current_customer_id');
+    if (customerIdError || !customerId) {
+      return NextResponse.json({ error: 'Sua conta não está vinculada a um cadastro de cliente.' }, { status: 403 });
+    }
+
     const [{ data: customer }, { data: address }, { data: company }, { data: ruleRows, error: rulesError }] = await Promise.all([
-      supabase.from('customers').select('document,icms_taxpayer_indicator,purchase_purpose').eq('id', user.id).maybeSingle(),
-      supabase.from('customer_addresses').select('id,state').eq('customer_id', user.id).eq('is_default', true).maybeSingle(),
+      supabase.from('customers').select('document,icms_taxpayer_indicator,purchase_purpose').eq('id', customerId).maybeSingle(),
+      supabase.from('customer_addresses').select('id,state').eq('customer_id', customerId).eq('is_default', true).maybeSingle(),
       supabase.from('fiscal_settings').select('crt,uf').limit(1).maybeSingle(),
       supabase.from('fiscal_rules').select('*').eq('status', 'approved')
     ]);
@@ -107,7 +112,7 @@ export async function POST(request: Request) {
     const { data: order, error: orderErr } = await supabase
       .from('orders')
       .insert({
-        customer_id: user.id,
+        customer_id: customerId,
         customer_email: user.email,
         status: 'pending_payment',
         total_amount: totalAmount
@@ -146,7 +151,7 @@ export async function POST(request: Request) {
     const cancelUrl = `${origin}/checkout/cancelado`;
 
     const session = await paymentService.createCheckoutSession(
-      user.id,
+      customerId,
       validatedItems,
       cancelUrl,
       successUrl,

@@ -28,14 +28,8 @@ interface UpdateCustomerInput {
   status: string;
 }
 
-const INTERNAL_EMAIL_DOMAIN = 'internal.tecnomotos.local';
-
 function normalizeEmail(email?: string) {
   return email?.trim().toLowerCase() || null;
-}
-
-function internalCustomerEmail(customerId: string) {
-  return `cliente-${customerId}@${INTERNAL_EMAIL_DOMAIN}`;
 }
 
 export async function createCustomerAction(input: CreateCustomerInput) {
@@ -52,58 +46,23 @@ export async function createCustomerAction(input: CreateCustomerInput) {
       return { success: false, error: 'Você não tem permissão para cadastrar clientes.' };
     }
 
-    const adminClient = createAdminClient();
-    const tempPassword = Math.random().toString(36).slice(-10) + 'A1!';
-    const email = normalizeEmail(input.email);
-    const authEmail = email || `cliente-${crypto.randomUUID()}@${INTERNAL_EMAIL_DOMAIN}`;
-
-    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
-      email: authEmail,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: {
-        role: 'CUSTOMER',
-        email_is_internal: !email,
-        full_name: input.fullName,
-        phone: input.phone,
-        address_street: input.street || '',
-        address_number: input.number || '',
-        address_complement: input.complement || '',
-        address_neighborhood: input.neighborhood || '',
-        address_city: input.city || '',
-        address_state: input.state || '',
-        address_postal_code: input.postalCode || '',
-      }
+    const { data: customerId, error: createError } = await supabaseServer.rpc('create_counter_customer', {
+      p_full_name: input.fullName,
+      p_email: normalizeEmail(input.email),
+      p_phone: input.phone,
+      p_document: input.document || null,
+      p_birth_date: input.birthDate || null,
+      p_street: input.street || null,
+      p_number: input.number || null,
+      p_complement: input.complement || null,
+      p_neighborhood: input.neighborhood || null,
+      p_city: input.city || null,
+      p_state: input.state || null,
+      p_postal_code: input.postalCode || null
     });
-    if (authError) return { success: false, error: authError.message };
+    if (createError) return { success: false, error: createError.message };
 
-    const newUserId = authData.user?.id;
-    if (!newUserId) return { success: false, error: 'Falha ao recuperar o ID do novo usuário.' };
-
-    // Auth requires an identifier; the generated email stays hidden from business data.
-    if (!email) {
-      const { error: profileEmailError } = await adminClient
-        .from('profiles')
-        .update({ email: null })
-        .eq('id', newUserId);
-      if (profileEmailError) {
-        await adminClient.auth.admin.deleteUser(newUserId);
-        return { success: false, error: profileEmailError.message };
-      }
-    }
-
-    if (input.document || input.birthDate) {
-      const { error: customerError } = await adminClient
-        .from('customers')
-        .update({
-          document: input.document ? input.document.replace(/\D/g, '') : null,
-          birth_date: input.birthDate || null,
-        })
-        .eq('id', newUserId);
-      if (customerError) console.error('[createCustomerAction] Error updating customer metadata:', customerError);
-    }
-
-    return { success: true, userId: newUserId };
+    return { success: true, customerId };
   } catch (err) {
     console.error('[createCustomerAction] Unexpected error:', err);
     return { success: false, error: err instanceof Error ? err.message : 'Erro inesperado ao cadastrar cliente.' };
@@ -127,24 +86,16 @@ export async function updateCustomerAction(input: UpdateCustomerInput) {
     const adminClient = createAdminClient();
     const { data: customer, error: lookupError } = await adminClient
       .from('customers')
-      .select('id')
+      .select('id, auth_user_id')
       .eq('id', input.customerId)
       .maybeSingle();
     if (lookupError || !customer) return { success: false, error: 'Cliente não encontrado.' };
-
-    const email = normalizeEmail(input.email);
-    const { error: authError } = await adminClient.auth.admin.updateUserById(input.customerId, {
-      email: email || internalCustomerEmail(input.customerId),
-      email_confirm: true,
-      user_metadata: { email_is_internal: !email }
-    });
-    if (authError) return { success: false, error: authError.message };
 
     const { error: profileError } = await adminClient
       .from('profiles')
       .update({
         full_name: input.fullName.trim(),
-        email,
+        email: normalizeEmail(input.email),
         phone: input.phone?.trim() || null,
         status: input.status
       })
@@ -178,8 +129,26 @@ export async function deleteCustomerAction(customerId: string) {
     if (currentUser.id === customerId) return { success: false, error: 'Você não pode excluir o próprio cadastro.' };
 
     const adminClient = createAdminClient();
-    const { error: deleteError } = await adminClient.auth.admin.deleteUser(customerId);
-    if (deleteError) return { success: false, error: deleteError.message };
+    const { data: customer, error: lookupError } = await adminClient
+      .from('customers')
+      .select('auth_user_id')
+      .eq('id', customerId)
+      .maybeSingle();
+    if (lookupError || !customer) return { success: false, error: 'Cliente não encontrado.' };
+
+    if (customer.auth_user_id) {
+      if (currentUser.id === customer.auth_user_id) {
+        return { success: false, error: 'Você não pode excluir o próprio cadastro.' };
+      }
+      const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(customer.auth_user_id);
+      if (authDeleteError) return { success: false, error: authDeleteError.message };
+    }
+
+    const { error: profileDeleteError } = await adminClient
+      .from('profiles')
+      .delete()
+      .eq('id', customerId);
+    if (profileDeleteError) return { success: false, error: profileDeleteError.message };
 
     return { success: true };
   } catch (err) {
