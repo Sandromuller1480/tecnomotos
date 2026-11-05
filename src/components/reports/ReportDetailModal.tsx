@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download, FileText, Package, Wrench, X } from 'lucide-react';
+import { Download, FileText, Package, Printer, Wrench, X } from 'lucide-react';
 import type { SaleReportDetail, ServiceReportDetail } from '@/lib/reports/report-pdf';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,8 @@ function DetailTable({ headers, rows }: { headers: string[]; rows: Array<Array<s
 export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
   const baseUrl = kind === 'sale' ? `/api/relatorios/vendas/${id}` : `/api/relatorios/servicos/${id}`;
 
   useEffect(() => {
@@ -74,6 +76,55 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const printPdf = async () => {
+    setIsPrinting(true);
+    setPrintError(null);
+
+    try {
+      const response = await fetch(`${baseUrl}?format=pdf`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Não foi possível preparar o documento para impressão.');
+
+      const pdfUrl = URL.createObjectURL(await response.blob());
+      const frame = document.createElement('iframe');
+      frame.title = kind === 'sale' ? 'Impressão da venda' : 'Impressão do serviço';
+      frame.style.position = 'fixed';
+      frame.style.right = '0';
+      frame.style.bottom = '0';
+      frame.style.width = '0';
+      frame.style.height = '0';
+      frame.style.border = '0';
+
+      const cleanup = () => {
+        URL.revokeObjectURL(pdfUrl);
+        frame.remove();
+      };
+
+      frame.onload = () => {
+        window.setTimeout(() => {
+          const printWindow = frame.contentWindow;
+          if (!printWindow) {
+            cleanup();
+            setPrintError('O navegador não conseguiu abrir a impressão do documento.');
+            setIsPrinting(false);
+            return;
+          }
+
+          printWindow.addEventListener('afterprint', cleanup, { once: true });
+          printWindow.focus();
+          printWindow.print();
+          setIsPrinting(false);
+          window.setTimeout(cleanup, 60_000);
+        }, 300);
+      };
+
+      frame.src = pdfUrl;
+      document.body.appendChild(frame);
+    } catch (error) {
+      setPrintError(error instanceof Error ? error.message : 'Não foi possível preparar o documento para impressão.');
+      setIsPrinting(false);
+    }
   };
 
   return (
@@ -103,9 +154,18 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
                   <Badge variant={detail.status === 'paid' || detail.status === 'COMPLETED' ? 'success' : 'neutral'}>{detail.status}</Badge>
                   <span className="text-xl font-black italic text-white">{money(detail.total)}</span>
                 </div>
-                <Button type="button" onClick={downloadPdf}>
-                  <Download className="h-4 w-4" /> Baixar PDF completo
-                </Button>
+                <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" onClick={downloadPdf}>
+                      <Download className="h-4 w-4" /> Baixar PDF completo
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => void printPdf()} disabled={isPrinting}>
+                      <Printer className="h-4 w-4" />
+                      {isPrinting ? 'Preparando...' : kind === 'sale' ? 'Imprimir venda' : 'Imprimir serviço'}
+                    </Button>
+                  </div>
+                  {printError && <p className="max-w-md text-right text-[10px] text-red-300">{printError}</p>}
+                </div>
               </div>
 
               <section>
