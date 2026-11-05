@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { ReportDetailModal } from '@/components/reports/ReportDetailModal';
 import { Check, ClipboardList, Eye, FileText, Pencil, Plus, Search, ShoppingCart, Trash2, Wrench, X } from 'lucide-react';
 import whatsappIcon from '../../../../inagens/ícone whatsapp.png';
 
@@ -251,6 +252,7 @@ export default function AdminQuotationsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
   const [viewingQuotation, setViewingQuotation] = useState<Quotation | null>(null);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [quotationToDelete, setQuotationToDelete] = useState<Quotation | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -915,8 +917,9 @@ export default function AdminQuotationsPage() {
                       {quotation.order_id && (
                         <button
                           type="button"
-                          onClick={() => router.push('/admin/pedidos')}
-                          title={`Venda #${quotation.order_id.slice(0, 8).toUpperCase()} gerada automaticamente`}
+                          onClick={() => setSelectedSaleId(quotation.order_id!)}
+                          title={`Abrir venda #${quotation.order_id.slice(0, 8).toUpperCase()}`}
+                          aria-label={`Abrir venda #${quotation.order_id.slice(0, 8).toUpperCase()}`}
                           className="inline-flex h-9 w-9 items-center justify-center border border-sky-500/35 bg-sky-500/10 text-sky-400 transition-colors hover:border-sky-400 hover:text-white"
                         >
                           <ShoppingCart className="h-4 w-4" />
@@ -1372,6 +1375,14 @@ export default function AdminQuotationsPage() {
             </h3>
           </div>
         </div>
+      )}
+
+      {selectedSaleId && (
+        <ReportDetailModal
+          kind="sale"
+          id={selectedSaleId}
+          onClose={() => setSelectedSaleId(null)}
+        />
       )}
     </div>
   );
