@@ -33,7 +33,7 @@ interface ProfileCustomer {
   id: string;
   full_name: string;
   email: string | null;
-  phone: string;
+  phone: string | null;
   avatar_url?: string;
   status: string;
   customers: {
@@ -249,10 +249,6 @@ export default function AdminCustomersPage() {
 
   const handleConfirmCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cName || !cPhone) {
-      error('Campos Obrigatórios', 'Nome e Telefone são necessários.');
-      return;
-    }
 
     setCreateSaving(true);
     const res = await createCustomerAction({
@@ -880,7 +876,7 @@ export default function AdminCustomersPage() {
                 Cadastrar Novo Cliente
               </h3>
               <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
-                Adicione um cliente e configure suas credenciais de acesso
+                Cadastro exclusivo do balcão, sem acesso à loja online
               </p>
             </div>
 
@@ -892,12 +888,11 @@ export default function AdminCustomersPage() {
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Nome Completo</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Nome Completo (Opcional)</label>
                     <Input
                       placeholder="Ex: Carlos Silva"
                       value={cName}
                       onChange={(e) => setCName(e.target.value)}
-                      required
                     />
                   </div>
                   <div className="space-y-1">
@@ -910,12 +905,11 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Telefone / WhatsApp</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Telefone / WhatsApp (Opcional)</label>
                     <Input
                       placeholder="Ex: (65) 99999-9999"
                       value={cPhone}
                       onChange={(e) => setCPhone(e.target.value)}
-                      required
                     />
                   </div>
                   <div className="space-y-1">
@@ -944,7 +938,7 @@ export default function AdminCustomersPage() {
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1 md:col-span-2">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Logradouro / Rua</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Logradouro / Rua (Opcional)</label>
                     <Input
                       placeholder="Ex: Av. Brasil"
                       value={cStreet}
@@ -952,7 +946,7 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Número</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Número (Opcional)</label>
                     <Input
                       placeholder="Ex: 123"
                       value={cNumber}
@@ -960,7 +954,7 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Complemento</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Complemento (Opcional)</label>
                     <Input
                       placeholder="Ex: Apto 2"
                       value={cComplement}
@@ -968,7 +962,7 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Bairro</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Bairro (Opcional)</label>
                     <Input
                       placeholder="Ex: Centro"
                       value={cNeighborhood}
@@ -976,7 +970,7 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Cidade</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Cidade (Opcional)</label>
                     <Input
                       placeholder="Ex: Tangará da Serra"
                       value={cCity}
@@ -984,7 +978,7 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Estado (UF)</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Estado (UF) (Opcional)</label>
                     <Input
                       placeholder="Ex: MT"
                       maxLength={2}
@@ -993,7 +987,7 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">CEP {isLookingUpCreateCep && '(consultando...)'}</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">CEP (Opcional) {isLookingUpCreateCep && '(consultando...)'}</label>
                     <Input
                       placeholder="Somente números"
                       value={cPostalCode}
@@ -1038,7 +1032,7 @@ export default function AdminCustomersPage() {
               CLIENTE CADASTRADO COM SUCESSO!
             </h3>
             <p className="text-[11px] text-brand-grey leading-normal">
-              O cadastro e o perfil do usuário foram provisionados no banco de dados.
+              O cliente foi registrado somente para atendimento na loja física.
             </p>
           </div>
         </div>
@@ -1097,11 +1091,10 @@ export default function AdminCustomersPage() {
               <form onSubmit={handleSaveInfo} className="space-y-4 text-left">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Nome Completo</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Nome Completo (Opcional no balcão)</label>
                     <Input
                       value={eName}
                       onChange={(e) => setEName(e.target.value)}
-                      required
                     />
                   </div>
                   <div className="space-y-1">
@@ -1114,7 +1107,7 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Telefone</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Telefone (Opcional)</label>
                     <Input
                       value={ePhone}
                       onChange={(e) => setEPhone(e.target.value)}

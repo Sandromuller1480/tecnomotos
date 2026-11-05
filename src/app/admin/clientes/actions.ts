@@ -4,9 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 interface CreateCustomerInput {
-  fullName: string;
+  fullName?: string;
   email?: string;
-  phone: string;
+  phone?: string;
   document?: string;
   birthDate?: string;
   street?: string;
@@ -20,7 +20,7 @@ interface CreateCustomerInput {
 
 interface UpdateCustomerInput {
   customerId: string;
-  fullName: string;
+  fullName?: string;
   email?: string;
   phone?: string;
   document?: string;
@@ -47,9 +47,9 @@ export async function createCustomerAction(input: CreateCustomerInput) {
     }
 
     const { data: customerId, error: createError } = await supabaseServer.rpc('create_counter_customer', {
-      p_full_name: input.fullName,
+      p_full_name: input.fullName?.trim() || null,
       p_email: normalizeEmail(input.email),
-      p_phone: input.phone,
+      p_phone: input.phone?.trim() || null,
       p_document: input.document || null,
       p_birth_date: input.birthDate || null,
       p_street: input.street || null,
@@ -91,10 +91,15 @@ export async function updateCustomerAction(input: UpdateCustomerInput) {
       .maybeSingle();
     if (lookupError || !customer) return { success: false, error: 'Cliente não encontrado.' };
 
+    const normalizedName = input.fullName?.trim() || '';
+    if (customer.auth_user_id && !normalizedName) {
+      return { success: false, error: 'O nome continua obrigatório para clientes com acesso à loja online.' };
+    }
+
     const { error: profileError } = await adminClient
       .from('profiles')
       .update({
-        full_name: input.fullName.trim(),
+        full_name: normalizedName || 'Cliente não identificado',
         email: normalizeEmail(input.email),
         phone: input.phone?.trim() || null,
         status: input.status
