@@ -52,6 +52,11 @@ interface ServiceOrder {
       email?: string | null;
     }> | null;
   }> | null;
+  quotation?: {
+    customer_name?: string | null;
+  } | Array<{
+    customer_name?: string | null;
+  }> | null;
 }
 
 const money = (value: number | string) =>
@@ -60,6 +65,12 @@ const money = (value: number | string) =>
 const customerProfile = (serviceOrder: ServiceOrder) => {
   const customer = Array.isArray(serviceOrder.customer) ? serviceOrder.customer[0] : serviceOrder.customer;
   return Array.isArray(customer?.profiles) ? customer.profiles[0] : customer?.profiles;
+};
+
+const serviceOrderCustomerName = (serviceOrder: ServiceOrder) => {
+  const profile = customerProfile(serviceOrder);
+  const quotation = Array.isArray(serviceOrder.quotation) ? serviceOrder.quotation[0] : serviceOrder.quotation;
+  return profile?.full_name?.trim() || quotation?.customer_name?.trim() || 'Cliente não identificado';
 };
 
 export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }) {
@@ -97,6 +108,9 @@ export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }
               full_name,
               email
             )
+          ),
+          quotation:quotations!service_orders_quotation_id_fkey (
+            customer_name
           )
         `)
         .eq('status', 'COMPLETED')
@@ -247,7 +261,6 @@ export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {pendingServiceOrders.map((serviceOrder) => {
-              const profile = customerProfile(serviceOrder);
               return (
                 <Card key={serviceOrder.id} className="flex flex-col justify-between" withStripe>
                   <div className="space-y-3">
@@ -256,7 +269,7 @@ export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }
                       <Badge variant="success" className="text-[9px]">CONCLUÍDA</Badge>
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold leading-tight text-white">{profile?.full_name || 'Cliente não identificado'}</h3>
+                      <h3 className="text-sm font-bold leading-tight text-white">{serviceOrderCustomerName(serviceOrder)}</h3>
                       <p className="mt-1 text-[11px] font-mono text-brand-grey">{serviceOrder.service_type}</p>
                     </div>
                   </div>

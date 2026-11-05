@@ -33,9 +33,23 @@ interface FiscalDocument {
 interface PendingFiscalOrder {
   id: string;
   customer_email: string;
+  customer_name?: string | null;
   total_amount: number | string;
   products_total?: number | string;
   created_at: string;
+  customer?: {
+    profiles?: {
+      full_name?: string | null;
+    } | Array<{
+      full_name?: string | null;
+    }> | null;
+  } | Array<{
+    profiles?: {
+      full_name?: string | null;
+    } | Array<{
+      full_name?: string | null;
+    }> | null;
+  }> | null;
   order_items?: Array<{
     id: string;
     item_type: 'PRODUCT' | 'SERVICE';
@@ -63,6 +77,13 @@ interface PendingFiscalOrder {
 
 const money = (value: number | string) =>
   (parseFloat(String(value)) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const orderCustomerName = (order: PendingFiscalOrder) => {
+  const customer = Array.isArray(order.customer) ? order.customer[0] : order.customer;
+  const profile = Array.isArray(customer?.profiles) ? customer.profiles[0] : customer?.profiles;
+  return order.customer_name?.trim() || profile?.full_name?.trim() || 'Cliente não identificado';
+};
+
 const fiscalStatusLabels: Record<string, string> = {
   pending: 'Pendente',
   processing: 'Em processamento',
@@ -104,9 +125,15 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
       .select(`
         id,
         customer_email,
+        customer_name,
         total_amount,
         products_total,
         created_at,
+        customer:customers!orders_customer_id_fkey (
+          profiles!customers_id_fkey (
+            full_name
+          )
+        ),
         order_items (
           id,
           item_type,
@@ -188,7 +215,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: order.id,
-          customerName: order.customer_email,
+          customerName: orderCustomerName(order),
           customerDocument: '',
           paymentMethod: 'other'
         }),
@@ -306,7 +333,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
                     <Badge variant="success" className="text-[9px]">PAGO</Badge>
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white leading-tight">{order.customer_email}</h3>
+                    <h3 className="text-sm font-bold text-white leading-tight">{orderCustomerName(order)}</h3>
                     <p className="text-[11px] text-brand-grey mt-1 font-mono">{order.order_items?.length || 0} item(ns)</p>
                   </div>
                 </div>
