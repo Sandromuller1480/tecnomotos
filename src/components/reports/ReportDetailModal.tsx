@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download, FileText, Package, Printer, Wrench, X } from 'lucide-react';
+import { Download, FileText, Package, Printer, ReceiptText, Wrench, X } from 'lucide-react';
 import type { SaleReportDetail, ServiceReportDetail } from '@/lib/reports/report-pdf';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
 
 type Detail = SaleReportDetail | ServiceReportDetail;
 
@@ -47,10 +48,13 @@ function DetailTable({ headers, rows }: { headers: string[]; rows: Array<Array<s
 }
 
 export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps) {
+  const { success, error } = useToast();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
+  const [emittingFiscal, setEmittingFiscal] = useState<'products' | 'services' | null>(null);
+  const [issuedFiscal, setIssuedFiscal] = useState<{ products?: boolean; services?: boolean }>({});
   const baseUrl = kind === 'sale' ? `/api/relatorios/vendas/${id}` : `/api/relatorios/servicos/${id}`;
 
   useEffect(() => {
@@ -127,6 +131,39 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
     }
   };
 
+  const emitFiscalDocument = async (documentKind: 'products' | 'services') => {
+    if (!detail || detail.kind !== 'sale') return;
+
+    const serviceOrderId = detail.serviceOrder?.id;
+    if (documentKind === 'services' && !serviceOrderId) {
+      error('NFS-e indisponível', 'A venda não possui uma ordem de serviço vinculada.');
+      return;
+    }
+
+    setEmittingFiscal(documentKind);
+    try {
+      const response = await fetch(documentKind === 'products' ? '/api/fiscal/emit' : '/api/fiscal/emit-service', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(documentKind === 'products'
+          ? { orderId: detail.id }
+          : { serviceOrderId })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Não foi possível emitir a nota fiscal.');
+
+      setIssuedFiscal((current) => ({ ...current, [documentKind]: true }));
+      success(
+        documentKind === 'products' ? 'Nota de produtos processada' : 'NFS-e processada',
+        result.reused ? 'O documento fiscal já existente foi reutilizado.' : 'Documento fiscal emitido com sucesso.'
+      );
+    } catch (emitError) {
+      error('Falha na emissão fiscal', emitError instanceof Error ? emitError.message : 'Não foi possível emitir a nota fiscal.');
+    } finally {
+      setEmittingFiscal(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
       <Card className="max-h-[92vh] w-full max-w-5xl overflow-y-auto p-0" withStripe>
@@ -167,6 +204,50 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
                   {printError && <p className="max-w-md text-right text-[10px] text-red-300">{printError}</p>}
                 </div>
               </div>
+
+              {detail.kind === 'sale' && (() => {
+                const hasProducts = detail.items.some((item) => item.itemType === 'PRODUCT');
+                const hasServices = detail.items.some((item) => item.itemType === 'SERVICE');
+                const productReady = detail.status === 'paid';
+                const serviceReady = detail.serviceOrder?.status === 'COMPLETED';
+
+                if (!hasProducts && !hasServices) return null;
+
+                return (
+                  <div className="flex flex-wrap items-center gap-2 border-y border-brand-grey/10 py-3">
+                    <span className="mr-1 text-[9px] font-mono font-black uppercase tracking-[0.18em] text-brand-red">Emissão fiscal</span>
+                    {hasProducts && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => void emitFiscalDocument('products')}
+                        disabled={!productReady || emittingFiscal !== null || issuedFiscal.products}
+                        title={!productReady ? 'Disponível após a confirmação do pagamento' : 'Emitir nota fiscal dos produtos'}
+                      >
+                        <ReceiptText className="h-4 w-4" />
+                        {issuedFiscal.products ? 'Nota de produtos emitida' : emittingFiscal === 'products' ? 'Emitindo...' : 'Emitir nota de produtos'}
+                      </Button>
+                    )}
+                    {hasServices && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void emitFiscalDocument('services')}
+                        disabled={!serviceReady || !detail.serviceOrder || emittingFiscal !== null || issuedFiscal.services}
+                        title={!detail.serviceOrder
+                          ? 'Ordem de serviço não localizada'
+                          : !serviceReady
+                            ? 'Disponível quando a ordem de serviço estiver concluída'
+                            : 'Emitir nota fiscal dos serviços'}
+                      >
+                        <ReceiptText className="h-4 w-4" />
+                        {issuedFiscal.services ? 'NFS-e emitida' : emittingFiscal === 'services' ? 'Emitindo...' : 'Emitir NFS-e'}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
 
               <section>
                 <h4 className="mb-3 text-[10px] font-mono font-black uppercase tracking-[0.2em] text-brand-red">Cliente</h4>

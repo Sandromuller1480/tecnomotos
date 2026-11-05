@@ -20,7 +20,12 @@ export interface SaleReportDetail {
   notes?: string | null;
   total: number;
   customer: ReportParty;
+  serviceOrder?: {
+    id: string;
+    status: string;
+  } | null;
   items: Array<{
+    itemType: 'PRODUCT' | 'SERVICE';
     sku?: string | null;
     name: string;
     brand?: string | null;

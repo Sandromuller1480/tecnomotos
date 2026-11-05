@@ -23,6 +23,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       customer_email,
       customer_name,
       status,
+      quotation_id,
       total_amount,
       sales_channel,
       payment_method,
@@ -52,6 +53,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const profile = one(customer?.profiles);
   const addresses = Array.isArray(customer?.addresses) ? customer.addresses : customer?.addresses ? [customer.addresses] : [];
   const address = addresses.find((item) => item.is_default) || addresses[0];
+  const { data: serviceOrder } = data.quotation_id
+    ? await supabase
+        .from('service_orders')
+        .select('id, status')
+        .eq('quotation_id', data.quotation_id)
+        .maybeSingle()
+    : { data: null };
+
   const detail: SaleReportDetail = {
     kind: 'sale',
     id: data.id,
@@ -62,6 +71,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     createdAt: data.created_at,
     notes: data.notes,
     total: Number(data.total_amount) || 0,
+    serviceOrder: serviceOrder
+      ? { id: serviceOrder.id, status: serviceOrder.status }
+      : null,
     customer: {
       name: data.customer_name || profile?.full_name || 'Cliente não identificado',
       email: data.customer_email || profile?.email,
@@ -76,6 +88,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const quantity = Number(row.quantity) || 0;
       const unitPrice = Number(row.unit_price) || 0;
       return {
+        itemType: row.item_type === 'SERVICE' ? 'SERVICE' : 'PRODUCT',
         sku: product?.sku,
         name: row.description || product?.name || (row.item_type === 'SERVICE' ? 'Serviço' : 'Produto removido'),
         brand: product?.brand,
