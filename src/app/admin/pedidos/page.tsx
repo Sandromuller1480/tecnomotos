@@ -20,8 +20,11 @@ import {
 
 interface OrderItem {
   id: string;
+  item_type: 'PRODUCT' | 'SERVICE';
+  description: string;
   quantity: number;
   unit_price: number;
+  total_price: number;
   products?: {
     name: string;
     sku: string;
@@ -30,6 +33,7 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  quotation_id: string | null;
   customer_id: string | null;
   customer_email: string;
   status: 'pending_payment' | 'paid' | 'payment_failed' | 'expired';
@@ -66,6 +70,7 @@ export default function AdminOrdersPage() {
         .from('orders')
         .select(`
           id,
+          quotation_id,
           customer_id,
           customer_email,
           status,
@@ -86,8 +91,11 @@ export default function AdminOrdersPage() {
           ),
           order_items (
             id,
+            item_type,
+            description,
             quantity,
             unit_price,
+            total_price,
             products: product_id (
               name,
               sku
@@ -114,6 +122,7 @@ export default function AdminOrdersPage() {
             return {
               ...item,
               unit_price: Number(item.unit_price) || 0,
+              total_price: Number(item.total_price) || 0,
               products: product ? { name: product.name, sku: product.sku } : undefined
             };
           })
@@ -366,8 +375,8 @@ export default function AdminOrdersPage() {
                     <TableBody>
                       {selectedOrder.order_items?.map((item, idx) => (
                         <TableRow key={idx}>
-                          <TableCell className="py-2 text-[10px] text-brand-red">{item.products?.sku}</TableCell>
-                          <TableCell className="py-2 text-[10px] text-white font-bold">{item.products?.name}</TableCell>
+                          <TableCell className="py-2 text-[10px] text-brand-red">{item.item_type === 'SERVICE' ? 'SERVIÇO' : item.products?.sku}</TableCell>
+                          <TableCell className="py-2 text-[10px] text-white font-bold">{item.description || item.products?.name}</TableCell>
                           <TableCell className="py-2 text-[10px]">{item.quantity} un</TableCell>
                           <TableCell className="py-2 text-[10px] text-right font-mono text-white">
                             R$ {item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

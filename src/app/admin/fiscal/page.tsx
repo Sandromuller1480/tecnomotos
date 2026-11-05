@@ -34,9 +34,11 @@ interface PendingFiscalOrder {
   id: string;
   customer_email: string;
   total_amount: number | string;
+  products_total?: number | string;
   created_at: string;
   order_items?: Array<{
     id: string;
+    item_type: 'PRODUCT' | 'SERVICE';
     quantity: number;
     unit_price: number | string;
     products?: {
@@ -103,9 +105,11 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
         id,
         customer_email,
         total_amount,
+        products_total,
         created_at,
         order_items (
           id,
+          item_type,
           quantity,
           unit_price,
           products: product_id (
@@ -125,7 +129,14 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
     if (fetchErr) throw fetchErr;
 
     const emittedOrderIds = new Set(currentDocuments.map((doc) => doc.order_id));
-    setOrders(((data || []) as unknown as PendingFiscalOrder[]).filter((order) => !emittedOrderIds.has(order.id)));
+    setOrders(((data || []) as unknown as PendingFiscalOrder[])
+      .filter((order) => !emittedOrderIds.has(order.id))
+      .map((order) => ({
+        ...order,
+        total_amount: Number(order.products_total) > 0 ? order.products_total! : order.total_amount,
+        order_items: (order.order_items || []).filter((item) => item.item_type !== 'SERVICE')
+      }))
+      .filter((order) => (order.order_items?.length || 0) > 0));
   };
 
   const loadFiscalData = async () => {

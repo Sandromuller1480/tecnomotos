@@ -35,8 +35,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         addresses:customer_addresses (street, number, complement, neighborhood, city, state, postal_code, is_default)
       ),
       order_items (
+        item_type,
+        description,
         quantity,
         unit_price,
+        total_price,
         products:product_id (sku, name, brand, category)
       )
     `)
@@ -74,12 +77,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const unitPrice = Number(row.unit_price) || 0;
       return {
         sku: product?.sku,
-        name: product?.name || 'Produto removido',
+        name: row.description || product?.name || (row.item_type === 'SERVICE' ? 'Serviço' : 'Produto removido'),
         brand: product?.brand,
         category: product?.category,
         quantity,
         unitPrice,
-        total: quantity * unitPrice
+        total: Number(row.total_price) || quantity * unitPrice
       };
     })
   };

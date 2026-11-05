@@ -261,11 +261,15 @@ export class FiscalOperationService {
         delivery_mode,
         purchase_purpose,
         total_amount,
+        products_total,
         status,
         order_items (
           id,
+          item_type,
+          description,
           quantity,
           unit_price,
+          total_price,
           products: product_id (
             id,
             sku,
@@ -305,13 +309,13 @@ export class FiscalOperationService {
       address = addressResult.data;
     }
 
-    const items = (order.order_items || []).map((item: any) => {
+    const items = (order.order_items || []).filter((item: any) => item.item_type !== 'SERVICE').map((item: any) => {
       const product = Array.isArray(item.products) ? item.products[0] : item.products;
       return {
         id: item.id,
         productId: product?.id,
         sku: product?.sku,
-        name: product?.name || 'Item do pedido',
+        name: item.description || product?.name || 'Item do pedido',
         quantity: Number(item.quantity) || 0,
         unitPrice: Number(item.unit_price) || 0,
         ncm: product?.ncm,
@@ -333,7 +337,7 @@ export class FiscalOperationService {
       customerEmail: order.customer_email,
       customerName: fallback?.customerName || order.customer_name || order.customer_email,
       customerDocument: customer?.document || fallback?.customerDocument || null,
-      totalAmount: Number(order.total_amount) || 0,
+      totalAmount: Number(order.products_total) || Number(order.total_amount) || 0,
       paymentMethod: order.payment_method || fallback?.paymentMethod || 'other',
       destinationUf: address?.state || (order.delivery_mode === 'pickup' ? process.env.FISCAL_UF || 'MT' : null),
       taxpayerIndicator: customer?.icms_taxpayer_indicator || null,

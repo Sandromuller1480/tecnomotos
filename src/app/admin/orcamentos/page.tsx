@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Check, ClipboardList, Eye, FileText, Pencil, Plus, Search, Trash2, Wrench, X } from 'lucide-react';
+import { Check, ClipboardList, Eye, FileText, Pencil, Plus, Search, ShoppingCart, Trash2, Wrench, X } from 'lucide-react';
 import whatsappIcon from '../../../../inagens/ícone whatsapp.png';
 
 type QuotationStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
@@ -168,6 +168,7 @@ interface Quotation {
   total_amount: number;
   notes: string | null;
   created_at: string;
+  order_id?: string | null;
   service_order_id?: string | null;
   quotation_items?: QuotationItem[];
 }
@@ -183,6 +184,7 @@ interface QuotationRow extends Omit<Quotation, 'subtotal' | 'discount_amount' | 
   discount_amount: number | string | null;
   total_amount: number | string | null;
   quotation_items?: QuotationItemRow[] | null;
+  orders?: { id: string; status: string }[] | { id: string; status: string } | null;
   service_orders?: { id: string }[] | { id: string } | null;
 }
 
@@ -286,6 +288,7 @@ export default function AdminQuotationsPage() {
         total_amount,
         notes,
         created_at,
+        orders:orders!orders_quotation_id_fkey ( id, status ),
         service_orders ( id ),
         quotation_items (
           id,
@@ -312,8 +315,12 @@ export default function AdminQuotationsPage() {
       const relatedOrder = Array.isArray(quotation.service_orders)
         ? quotation.service_orders[0]
         : quotation.service_orders;
+      const relatedSale = Array.isArray(quotation.orders)
+        ? quotation.orders[0]
+        : quotation.orders;
       return {
         ...quotation,
+        order_id: relatedSale?.id || null,
         service_order_id: relatedOrder?.id || null,
         subtotal: parseFloat(String(quotation.subtotal)) || 0,
         discount_amount: parseFloat(String(quotation.discount_amount)) || 0,
@@ -728,7 +735,12 @@ export default function AdminQuotationsPage() {
       }
       resetForm();
       setShowSuccessOverlay(true);
-      success('Orçamento gerado', 'O orçamento foi salvo no banco de dados.');
+      success(
+        status === 'APPROVED' ? 'Orçamento aprovado' : 'Orçamento gerado',
+        status === 'APPROVED'
+          ? 'A venda geral foi gerada. Havendo serviços, a ordem de serviço também foi criada.'
+          : 'O orçamento foi salvo no banco de dados.'
+      );
       window.setTimeout(() => setShowSuccessOverlay(false), 2200);
     } catch (err: unknown) {
       error('Erro ao gerar orçamento', getErrorMessage(err, 'Não foi possível salvar o orçamento.'));
@@ -900,6 +912,16 @@ export default function AdminQuotationsPage() {
                           <Wrench className="h-4 w-4" />
                         </button>
                       )}
+                      {quotation.order_id && (
+                        <button
+                          type="button"
+                          onClick={() => router.push('/admin/pedidos')}
+                          title={`Venda #${quotation.order_id.slice(0, 8).toUpperCase()} gerada automaticamente`}
+                          className="inline-flex h-9 w-9 items-center justify-center border border-sky-500/35 bg-sky-500/10 text-sky-400 transition-colors hover:border-sky-400 hover:text-white"
+                        >
+                          <ShoppingCart className="h-4 w-4" />
+                        </button>
+                      )}
                       {canManageQuotations && (
                         <>
                         <button
@@ -910,14 +932,16 @@ export default function AdminQuotationsPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setQuotationToDelete(quotation)}
-                          title="Deletar orçamento"
-                          className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-brand-red"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {!quotation.order_id && (
+                          <button
+                            type="button"
+                            onClick={() => setQuotationToDelete(quotation)}
+                            title="Deletar orçamento"
+                            className="inline-flex h-9 w-9 items-center justify-center border border-brand-grey/25 bg-brand-black text-brand-grey transition-colors hover:border-brand-red hover:text-brand-red"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                         </>
                       )}
                     </div>
@@ -1158,7 +1182,7 @@ export default function AdminQuotationsPage() {
                   </select>
                   {status === 'APPROVED' && (
                     <p className="text-[10px] font-mono text-emerald-400">
-                      Uma ordem de serviço será criada automaticamente ao salvar.
+                      Uma venda geral será criada automaticamente. Se houver serviços, uma ordem de serviço também será gerada.
                     </p>
                   )}
                 </div>

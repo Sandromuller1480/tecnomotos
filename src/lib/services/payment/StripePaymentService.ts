@@ -261,8 +261,9 @@ export class StripePaymentService extends PaymentService {
     // 2. Fetch order items to deduct stock
     const { data: items } = await supabase
       .from('order_items')
-      .select('product_id, quantity, unit_price')
-      .eq('order_id', orderId);
+      .select('product_id, quantity, unit_price, item_type')
+      .eq('order_id', orderId)
+      .eq('item_type', 'PRODUCT');
 
     for (const item of (items || [])) {
       const { data: prod } = await supabase
