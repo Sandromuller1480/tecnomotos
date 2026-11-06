@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
+import { Input } from '@/components/ui/input';
 
 type Detail = SaleReportDetail | ServiceReportDetail;
 
@@ -19,6 +20,31 @@ interface ReportDetailModalProps {
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateTime = (value?: string | null) => value ? new Date(value).toLocaleString('pt-BR') : '-';
+const BRAZILIAN_UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
+
+interface FiscalFormState {
+  issuerUf: string;
+  deliveryMode: 'pickup' | 'delivery' | '';
+  taxpayerIndicator: 'contributor' | 'exempt' | 'non_contributor' | '';
+  purchasePurpose: 'resale' | 'final_consumption' | '';
+  recipientName: string;
+  recipientDocument: string;
+  freightMode: 'issuer' | 'recipient' | 'third_party' | 'none' | '';
+  stateRegistration: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  destinationUf: string;
+  postalCode: string;
+}
+
+const emptyFiscalForm: FiscalFormState = {
+  issuerUf: 'MT', deliveryMode: '', taxpayerIndicator: '', purchasePurpose: '',
+  recipientName: '', recipientDocument: '', freightMode: '', stateRegistration: '', street: '', number: '',
+  complement: '', neighborhood: '', city: '', destinationUf: '', postalCode: ''
+};
 
 function Info({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -55,6 +81,8 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
   const [printError, setPrintError] = useState<string | null>(null);
   const [emittingFiscal, setEmittingFiscal] = useState<'products' | 'services' | null>(null);
   const [issuedFiscal, setIssuedFiscal] = useState<{ products?: boolean; services?: boolean }>({});
+  const [fiscalForm, setFiscalForm] = useState<FiscalFormState>(emptyFiscalForm);
+  const [isLookingUpFiscalCep, setIsLookingUpFiscalCep] = useState(false);
   const baseUrl = kind === 'sale' ? `/api/relatorios/vendas/${id}` : `/api/relatorios/servicos/${id}`;
 
   useEffect(() => {
@@ -64,7 +92,26 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
         const response = await fetch(baseUrl, { cache: 'no-store' });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Não foi possível carregar os detalhes.');
-        if (active) setDetail(result as Detail);
+        if (active) {
+          const loaded = result as Detail;
+          setDetail(loaded);
+          if (loaded.kind === 'sale') {
+            const context = loaded.fiscalContext;
+            setFiscalForm({
+              issuerUf: context?.issuerUf || 'MT',
+              deliveryMode: context?.deliveryMode || (loaded.salesChannel === 'COUNTER' ? 'pickup' : 'delivery'),
+              taxpayerIndicator: context?.taxpayerIndicator || '',
+              purchasePurpose: context?.purchasePurpose || '',
+              recipientName: context?.recipientName || loaded.customer.name || '',
+              recipientDocument: context?.recipientDocument || loaded.customer.document || '',
+              freightMode: context?.freightMode || (context?.deliveryMode === 'pickup' ? 'none' : ''),
+              stateRegistration: context?.stateRegistration || '',
+              street: context?.street || '', number: context?.number || '', complement: context?.complement || '',
+              neighborhood: context?.neighborhood || '', city: context?.city || '',
+              destinationUf: context?.destinationUf || '', postalCode: context?.postalCode || ''
+            });
+          }
+        }
       } catch (error) {
         if (active) setLoadError(error instanceof Error ? error.message : 'Falha ao carregar detalhes.');
       }
@@ -140,13 +187,42 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
       return;
     }
 
+    if (documentKind === 'products') {
+      if (!fiscalForm.deliveryMode || !fiscalForm.taxpayerIndicator || !fiscalForm.purchasePurpose
+          || (fiscalForm.deliveryMode === 'delivery' && !fiscalForm.freightMode)) {
+        error('Dados fiscais incompletos', 'Informe destino, frete, situação perante o ICMS e finalidade da compra.');
+        return;
+      }
+      const destinationUf = fiscalForm.deliveryMode === 'pickup' ? fiscalForm.issuerUf : fiscalForm.destinationUf;
+      const requiresNfe = destinationUf !== fiscalForm.issuerUf
+        || fiscalForm.taxpayerIndicator !== 'non_contributor'
+        || fiscalForm.purchasePurpose !== 'final_consumption';
+      if (requiresNfe) {
+        const document = fiscalForm.recipientDocument.replace(/\D/g, '');
+        const postalCode = fiscalForm.postalCode.replace(/\D/g, '');
+        if (!fiscalForm.recipientName.trim() || ![11, 14].includes(document.length)) {
+          error('Destinatário incompleto', 'Para NF-e, informe nome e CPF/CNPJ válido do destinatário.');
+          return;
+        }
+        if (!fiscalForm.street.trim() || !fiscalForm.number.trim() || !fiscalForm.neighborhood.trim()
+            || !fiscalForm.city.trim() || !fiscalForm.destinationUf || postalCode.length !== 8) {
+          error('Endereço incompleto', 'Para NF-e, informe o endereço completo do destinatário.');
+          return;
+        }
+        if (fiscalForm.taxpayerIndicator === 'contributor' && !fiscalForm.stateRegistration.trim()) {
+          error('Inscrição Estadual obrigatória', 'Informe a IE do destinatário contribuinte.');
+          return;
+        }
+      }
+    }
+
     setEmittingFiscal(documentKind);
     try {
       const response = await fetch(documentKind === 'products' ? '/api/fiscal/emit' : '/api/fiscal/emit-service', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(documentKind === 'products'
-          ? { orderId: detail.id }
+          ? { orderId: detail.id, fiscalContext: fiscalForm }
           : { serviceOrderId })
       });
       const result = await response.json();
@@ -161,6 +237,36 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
       error('Falha na emissão fiscal', emitError instanceof Error ? emitError.message : 'Não foi possível emitir a nota fiscal.');
     } finally {
       setEmittingFiscal(null);
+    }
+  };
+
+  const updateFiscalForm = (field: keyof FiscalFormState, value: string) => {
+    setFiscalForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const lookupFiscalCep = async (value: string) => {
+    const postalCode = value.replace(/\D/g, '').slice(0, 8);
+    updateFiscalForm('postalCode', postalCode);
+    if (postalCode.length !== 8) return;
+
+    setIsLookingUpFiscalCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${postalCode}/json/`);
+      if (!response.ok) throw new Error('Não foi possível consultar o CEP.');
+      const address = await response.json() as { erro?: boolean; logradouro?: string; complemento?: string; bairro?: string; localidade?: string; uf?: string };
+      if (address.erro) throw new Error('CEP não encontrado.');
+      setFiscalForm((current) => ({
+        ...current,
+        street: address.logradouro || current.street,
+        complement: address.complemento || current.complement,
+        neighborhood: address.bairro || current.neighborhood,
+        city: address.localidade || current.city,
+        destinationUf: address.uf || current.destinationUf
+      }));
+    } catch (cepError) {
+      error('Erro ao consultar CEP', cepError instanceof Error ? cepError.message : 'Verifique o CEP informado.');
+    } finally {
+      setIsLookingUpFiscalCep(false);
     }
   };
 
@@ -213,39 +319,162 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
 
                 if (!hasProducts && !hasServices) return null;
 
+                const destinationUf = fiscalForm.deliveryMode === 'pickup' ? fiscalForm.issuerUf : fiscalForm.destinationUf;
+                const estimatedNfe = Boolean(destinationUf) && (
+                  destinationUf !== fiscalForm.issuerUf
+                  || fiscalForm.taxpayerIndicator === 'contributor'
+                  || fiscalForm.taxpayerIndicator === 'exempt'
+                  || fiscalForm.purchasePurpose === 'resale'
+                );
+                const showAddress = fiscalForm.deliveryMode === 'delivery' || estimatedNfe;
+                const selectClass = 'w-full border border-brand-grey/20 bg-brand-darkgrey px-3 py-2.5 text-xs text-white focus:border-brand-red focus:outline-none';
+
                 return (
-                  <div className="flex flex-wrap items-center gap-2 border-y border-brand-grey/10 py-3">
-                    <span className="mr-1 text-[9px] font-mono font-black uppercase tracking-[0.18em] text-brand-red">Emissão fiscal</span>
+                  <section className="space-y-4 border-y border-brand-grey/10 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-brand-red">Emissão fiscal</h4>
+                        {hasProducts && <p className="mt-1 text-[10px] text-brand-grey">Modelo estimado: {estimatedNfe ? 'NF-e (55)' : 'NFC-e (65)'}</p>}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {hasProducts && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => void emitFiscalDocument('products')}
+                            disabled={!productReady || emittingFiscal !== null || issuedFiscal.products}
+                            title={!productReady ? 'Disponível após a confirmação do pagamento' : 'Emitir nota fiscal dos produtos'}
+                          >
+                            <ReceiptText className="h-4 w-4" />
+                            {issuedFiscal.products ? 'Nota de produtos emitida' : emittingFiscal === 'products' ? 'Emitindo...' : 'Emitir nota de produtos'}
+                          </Button>
+                        )}
+                        {hasServices && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void emitFiscalDocument('services')}
+                            disabled={!serviceReady || !detail.serviceOrder || emittingFiscal !== null || issuedFiscal.services}
+                            title={!detail.serviceOrder
+                              ? 'Ordem de serviço não localizada'
+                              : !serviceReady
+                                ? 'Disponível quando a ordem de serviço estiver concluída'
+                                : 'Emitir nota fiscal dos serviços'}
+                          >
+                            <ReceiptText className="h-4 w-4" />
+                            {issuedFiscal.services ? 'NFS-e emitida' : emittingFiscal === 'services' ? 'Emitindo...' : 'Emitir NFS-e'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
                     {hasProducts && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => void emitFiscalDocument('products')}
-                        disabled={!productReady || emittingFiscal !== null || issuedFiscal.products}
-                        title={!productReady ? 'Disponível após a confirmação do pagamento' : 'Emitir nota fiscal dos produtos'}
-                      >
-                        <ReceiptText className="h-4 w-4" />
-                        {issuedFiscal.products ? 'Nota de produtos emitida' : emittingFiscal === 'products' ? 'Emitindo...' : 'Emitir nota de produtos'}
-                      </Button>
+                      <div className="grid grid-cols-1 gap-3 border border-brand-grey/15 bg-brand-black/35 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                          Destino da mercadoria
+                          <select
+                            className={selectClass}
+                            value={fiscalForm.deliveryMode}
+                            onChange={(event) => setFiscalForm((current) => ({
+                              ...current,
+                              deliveryMode: event.target.value as FiscalFormState['deliveryMode'],
+                              freightMode: event.target.value === 'pickup' ? 'none' : current.freightMode === 'none' ? '' : current.freightMode
+                            }))}
+                          >
+                            <option value="">Selecione</option>
+                            <option value="pickup">Retirada na Tecnomotos</option>
+                            <option value="delivery">Entrega ao cliente</option>
+                          </select>
+                        </label>
+                        {fiscalForm.deliveryMode === 'delivery' && (
+                          <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                            Modalidade do frete
+                            <select className={selectClass} value={fiscalForm.freightMode} onChange={(event) => updateFiscalForm('freightMode', event.target.value)}>
+                              <option value="">Selecione</option>
+                              <option value="issuer">Por conta da Tecnomotos</option>
+                              <option value="recipient">Por conta do destinatário</option>
+                              <option value="third_party">Por conta de terceiros</option>
+                              <option value="none">Sem frete</option>
+                            </select>
+                          </label>
+                        )}
+                        <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                          Situação perante o ICMS
+                          <select className={selectClass} value={fiscalForm.taxpayerIndicator} onChange={(event) => updateFiscalForm('taxpayerIndicator', event.target.value)}>
+                            <option value="">Selecione</option>
+                            <option value="non_contributor">Não contribuinte</option>
+                            <option value="contributor">Contribuinte</option>
+                            <option value="exempt">Isento</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                          Finalidade da compra
+                          <select className={selectClass} value={fiscalForm.purchasePurpose} onChange={(event) => updateFiscalForm('purchasePurpose', event.target.value)}>
+                            <option value="">Selecione</option>
+                            <option value="final_consumption">Consumo final</option>
+                            <option value="resale">Revenda</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                          UF de destino
+                          <select
+                            className={selectClass}
+                            value={fiscalForm.deliveryMode === 'pickup' ? fiscalForm.issuerUf : fiscalForm.destinationUf}
+                            onChange={(event) => updateFiscalForm('destinationUf', event.target.value)}
+                            disabled={fiscalForm.deliveryMode === 'pickup'}
+                          >
+                            <option value="">Selecione</option>
+                            {BRAZILIAN_UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+                          </select>
+                        </label>
+
+                        <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey sm:col-span-2">
+                          Nome / Razão social do destinatário
+                          <Input value={fiscalForm.recipientName} onChange={(event) => updateFiscalForm('recipientName', event.target.value)} />
+                        </label>
+                        <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                          CPF / CNPJ
+                          <Input inputMode="numeric" value={fiscalForm.recipientDocument} onChange={(event) => updateFiscalForm('recipientDocument', event.target.value)} />
+                        </label>
+                        {fiscalForm.taxpayerIndicator === 'contributor' && (
+                          <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                            Inscrição Estadual
+                            <Input value={fiscalForm.stateRegistration} onChange={(event) => updateFiscalForm('stateRegistration', event.target.value)} />
+                          </label>
+                        )}
+
+                        {showAddress && (
+                          <>
+                            <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                              CEP {isLookingUpFiscalCep && '(consultando...)'}
+                              <Input inputMode="numeric" maxLength={8} value={fiscalForm.postalCode} onChange={(event) => void lookupFiscalCep(event.target.value)} />
+                            </label>
+                            <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey sm:col-span-2">
+                              Logradouro
+                              <Input value={fiscalForm.street} onChange={(event) => updateFiscalForm('street', event.target.value)} />
+                            </label>
+                            <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                              Número
+                              <Input value={fiscalForm.number} onChange={(event) => updateFiscalForm('number', event.target.value)} />
+                            </label>
+                            <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                              Complemento
+                              <Input value={fiscalForm.complement} onChange={(event) => updateFiscalForm('complement', event.target.value)} />
+                            </label>
+                            <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                              Bairro
+                              <Input value={fiscalForm.neighborhood} onChange={(event) => updateFiscalForm('neighborhood', event.target.value)} />
+                            </label>
+                            <label className="space-y-1 text-[9px] font-mono uppercase tracking-wider text-brand-grey">
+                              Cidade
+                              <Input value={fiscalForm.city} onChange={(event) => updateFiscalForm('city', event.target.value)} />
+                            </label>
+                          </>
+                        )}
+                      </div>
                     )}
-                    {hasServices && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => void emitFiscalDocument('services')}
-                        disabled={!serviceReady || !detail.serviceOrder || emittingFiscal !== null || issuedFiscal.services}
-                        title={!detail.serviceOrder
-                          ? 'Ordem de serviço não localizada'
-                          : !serviceReady
-                            ? 'Disponível quando a ordem de serviço estiver concluída'
-                            : 'Emitir nota fiscal dos serviços'}
-                      >
-                        <ReceiptText className="h-4 w-4" />
-                        {issuedFiscal.services ? 'NFS-e emitida' : emittingFiscal === 'services' ? 'Emitindo...' : 'Emitir NFS-e'}
-                      </Button>
-                    )}
-                  </div>
+                  </section>
                 );
               })()}
 

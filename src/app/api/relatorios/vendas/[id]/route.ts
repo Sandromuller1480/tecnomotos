@@ -30,8 +30,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       payment_date,
       notes,
       created_at,
+      delivery_mode,
+      purchase_purpose,
+      fiscal_taxpayer_indicator,
+      fiscal_state_registration,
+      fiscal_recipient_document,
+      fiscal_freight_mode,
+      fiscal_destination_street,
+      fiscal_destination_number,
+      fiscal_destination_complement,
+      fiscal_destination_neighborhood,
+      fiscal_destination_city,
+      fiscal_destination_uf,
+      fiscal_destination_postal_code,
       customer:customers!orders_customer_id_fkey (
         document,
+        state_registration,
+        icms_taxpayer_indicator,
+        purchase_purpose,
         profiles!customers_id_fkey (full_name, email, phone),
         addresses:customer_addresses (street, number, complement, neighborhood, city, state, postal_code, is_default)
       ),
@@ -74,6 +90,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     serviceOrder: serviceOrder
       ? { id: serviceOrder.id, status: serviceOrder.status }
       : null,
+    fiscalContext: {
+      issuerUf: process.env.FISCAL_UF || 'MT',
+      deliveryMode: data.delivery_mode === 'delivery' ? 'delivery' : data.delivery_mode === 'pickup' ? 'pickup' : null,
+      taxpayerIndicator: data.fiscal_taxpayer_indicator || customer?.icms_taxpayer_indicator || null,
+      purchasePurpose: data.purchase_purpose || customer?.purchase_purpose || null,
+      recipientName: data.customer_name || profile?.full_name || null,
+      recipientDocument: data.fiscal_recipient_document || customer?.document || null,
+      freightMode: data.fiscal_freight_mode || (data.delivery_mode === 'pickup' ? 'none' : null),
+      stateRegistration: data.fiscal_state_registration || customer?.state_registration || null,
+      street: data.fiscal_destination_street || address?.street || null,
+      number: data.fiscal_destination_number || address?.number || null,
+      complement: data.fiscal_destination_complement || address?.complement || null,
+      neighborhood: data.fiscal_destination_neighborhood || address?.neighborhood || null,
+      city: data.fiscal_destination_city || address?.city || null,
+      destinationUf: data.fiscal_destination_uf || address?.state || null,
+      postalCode: data.fiscal_destination_postal_code || address?.postal_code || null
+    },
     customer: {
       name: data.customer_name || profile?.full_name || 'Cliente não identificado',
       email: data.customer_email || profile?.email,

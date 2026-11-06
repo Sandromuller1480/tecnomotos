@@ -41,13 +41,25 @@ export interface FiscalSale {
   id: string;
   customerName?: string | null;
   customerDocument?: string | null;
+  customerStateRegistration?: string | null;
   customerEmail?: string | null;
   totalAmount: number;
   paymentMethod: string;
+  buyerPresence?: '1' | '2' | '9';
+  freightMode?: 'issuer' | 'recipient' | 'third_party' | 'none' | null;
   documentModel?: '55' | '65';
   destinationUf?: string | null;
   taxpayerIndicator?: 'contributor' | 'exempt' | 'non_contributor' | null;
   purchasePurpose?: 'resale' | 'final_consumption' | null;
+  destinationAddress?: {
+    street?: string | null;
+    number?: string | null;
+    complement?: string | null;
+    neighborhood?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+  } | null;
   items: FiscalSaleItem[];
 }
 

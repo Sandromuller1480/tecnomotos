@@ -24,6 +24,23 @@ export interface SaleReportDetail {
     id: string;
     status: string;
   } | null;
+  fiscalContext?: {
+    issuerUf: string;
+    deliveryMode?: 'pickup' | 'delivery' | null;
+    taxpayerIndicator?: 'contributor' | 'exempt' | 'non_contributor' | null;
+    purchasePurpose?: 'resale' | 'final_consumption' | null;
+    recipientName?: string | null;
+    recipientDocument?: string | null;
+    freightMode?: 'issuer' | 'recipient' | 'third_party' | 'none' | null;
+    stateRegistration?: string | null;
+    street?: string | null;
+    number?: string | null;
+    complement?: string | null;
+    neighborhood?: string | null;
+    city?: string | null;
+    destinationUf?: string | null;
+    postalCode?: string | null;
+  };
   items: Array<{
     itemType: 'PRODUCT' | 'SERVICE';
     sku?: string | null;

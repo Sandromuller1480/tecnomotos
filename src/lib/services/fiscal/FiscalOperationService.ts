@@ -257,9 +257,21 @@ export class FiscalOperationService {
         customer_id,
         customer_name,
         payment_method,
+        sales_channel,
         delivery_address_id,
         delivery_mode,
         purchase_purpose,
+        fiscal_taxpayer_indicator,
+        fiscal_state_registration,
+        fiscal_recipient_document,
+        fiscal_freight_mode,
+        fiscal_destination_street,
+        fiscal_destination_number,
+        fiscal_destination_complement,
+        fiscal_destination_neighborhood,
+        fiscal_destination_city,
+        fiscal_destination_uf,
+        fiscal_destination_postal_code,
         total_amount,
         products_total,
         status,
@@ -302,7 +314,7 @@ export class FiscalOperationService {
     if (order.customer_id) {
       const customerResult = await this.db.from('customers').select('document, state_registration, icms_taxpayer_indicator, purchase_purpose').eq('id', order.customer_id).maybeSingle();
       customer = customerResult.data;
-      const addressQuery = this.db.from('customer_addresses').select('state').eq('customer_id', order.customer_id);
+      const addressQuery = this.db.from('customer_addresses').select('street, number, complement, neighborhood, city, state, postal_code').eq('customer_id', order.customer_id);
       const addressResult = order.delivery_address_id
         ? await addressQuery.eq('id', order.delivery_address_id).maybeSingle()
         : await addressQuery.eq('is_default', true).maybeSingle();
@@ -336,12 +348,24 @@ export class FiscalOperationService {
       id: order.id,
       customerEmail: order.customer_email,
       customerName: fallback?.customerName || order.customer_name || order.customer_email,
-      customerDocument: customer?.document || fallback?.customerDocument || null,
+      customerDocument: order.fiscal_recipient_document || customer?.document || fallback?.customerDocument || null,
+      customerStateRegistration: order.fiscal_state_registration || customer?.state_registration || null,
       totalAmount: Number(order.products_total) || Number(order.total_amount) || 0,
       paymentMethod: order.payment_method || fallback?.paymentMethod || 'other',
-      destinationUf: address?.state || (order.delivery_mode === 'pickup' ? process.env.FISCAL_UF || 'MT' : null),
-      taxpayerIndicator: customer?.icms_taxpayer_indicator || null,
+      buyerPresence: order.sales_channel === 'ONLINE' ? '2' : '1',
+      freightMode: order.delivery_mode === 'pickup' ? 'none' : order.fiscal_freight_mode || 'none',
+      destinationUf: order.fiscal_destination_uf || address?.state || (order.delivery_mode === 'pickup' ? process.env.FISCAL_UF || 'MT' : null),
+      taxpayerIndicator: order.fiscal_taxpayer_indicator || customer?.icms_taxpayer_indicator || null,
       purchasePurpose: order.purchase_purpose || customer?.purchase_purpose || null,
+      destinationAddress: {
+        street: order.fiscal_destination_street || address?.street,
+        number: order.fiscal_destination_number || address?.number,
+        complement: order.fiscal_destination_complement || address?.complement,
+        neighborhood: order.fiscal_destination_neighborhood || address?.neighborhood,
+        city: order.fiscal_destination_city || address?.city,
+        state: order.fiscal_destination_uf || address?.state,
+        postalCode: order.fiscal_destination_postal_code || address?.postal_code
+      },
       items
     };
   }
@@ -370,7 +394,7 @@ export class FiscalOperationService {
       destinationScope, taxpayerIndicator: sale.taxpayerIndicator, purchasePurpose: sale.purchasePurpose,
       operationType: 'sale', documentModel, occurredAt: new Date()
     };
-    return {
+    const resolvedSale = {
       ...sale,
       documentModel,
       items: sale.items.map((item) => {
@@ -382,6 +406,22 @@ export class FiscalOperationService {
         return { ...item, cfop: resolved.cfop, csosn: resolved.csosn, cst: resolved.cstIcms, fiscalRuleId: resolved.ruleId, fiscalRuleVersion: resolved.ruleVersion, taxParameters: resolved.taxParameters };
       })
     };
+
+    if (documentModel === '55') {
+      const document = digitsOnly(resolvedSale.customerDocument);
+      const destination = resolvedSale.destinationAddress;
+      if (document.length !== 11 && document.length !== 14) throw new Error('Informe CPF ou CNPJ válido do destinatário para emitir NF-e.');
+      if (!resolvedSale.customerName?.trim()) throw new Error('Informe o nome ou razão social do destinatário para emitir NF-e.');
+      if (!destination?.street?.trim() || !destination.number?.trim() || !destination.neighborhood?.trim()
+          || !destination.city?.trim() || !destination.state?.trim() || digitsOnly(destination.postalCode).length !== 8) {
+        throw new Error('Informe o endereço completo do destinatário para emitir NF-e.');
+      }
+      if (resolvedSale.taxpayerIndicator === 'contributor' && !resolvedSale.customerStateRegistration?.trim()) {
+        throw new Error('Informe a Inscrição Estadual do destinatário contribuinte.');
+      }
+    }
+
+    return resolvedSale;
   }
 
   private async loadServiceOrder(serviceOrderId: string): Promise<FiscalServiceOrder> {
