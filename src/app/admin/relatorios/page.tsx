@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { ReportDetailModal } from '@/components/reports/ReportDetailModal';
@@ -17,15 +19,18 @@ import {
   ArrowUpCircle,
   BarChart3,
   ClipboardList,
+  CreditCard,
   Download,
   FileText,
   Eye,
   Package,
+  Pencil,
   Printer,
   RefreshCw,
   Search,
   ShieldCheck,
   ShoppingBag,
+  Trash2,
   Wrench
 } from 'lucide-react';
 
@@ -38,6 +43,9 @@ interface OrderRow {
   status: string;
   total_amount: number | string;
   payment_date: string | null;
+  payment_method: string | null;
+  sales_channel: 'ONLINE' | 'COUNTER';
+  notes: string | null;
   created_at: string;
 }
 
@@ -133,6 +141,30 @@ function orderCustomerName(order: OrderRow) {
   return order.customer_name?.trim() || order.customer_email;
 }
 
+function errorMessage(value: unknown, fallback: string) {
+  if (value instanceof Error) return value.message;
+  if (value && typeof value === 'object' && 'message' in value && typeof value.message === 'string') return value.message;
+  return fallback;
+}
+
+function SaleStatusBadge({ status }: { status: string }) {
+  if (status === 'paid') return <Badge variant="success">Venda paga</Badge>;
+  if (status === 'pending_payment') return <Badge variant="warning">Venda pendente</Badge>;
+  if (status === 'payment_failed') return <Badge variant="danger">Pagamento falhou</Badge>;
+  if (status === 'expired') return <Badge variant="neutral">Venda expirada</Badge>;
+  return <Badge variant="neutral">{status}</Badge>;
+}
+
+const paymentMethodOptions = [
+  { value: 'Dinheiro', label: 'Dinheiro' },
+  { value: 'PIX', label: 'PIX' },
+  { value: 'Cartão de débito', label: 'Cartão de débito' },
+  { value: 'Cartão de crédito', label: 'Cartão de crédito' },
+  { value: 'Boleto', label: 'Boleto' },
+  { value: 'Transferência', label: 'Transferência' },
+  { value: 'Outro', label: 'Outro' }
+];
+
 function csvEscape(value: unknown) {
   const text = String(value ?? '');
   return `"${text.replace(/"/g, '""')}"`;
@@ -163,7 +195,7 @@ interface AdminReportsPageProps {
 export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminReportsPageProps) {
   const router = useRouter();
   const supabase = createClient();
-  const { success, error, info } = useToast();
+  const { success, error } = useToast();
 
   const [data, setData] = useState<ReportData>({
     orders: [],
@@ -185,13 +217,19 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
   });
   const [endDate, setEndDate] = useState(today);
   const [selectedDetail, setSelectedDetail] = useState<{ kind: 'sale' | 'service'; id: string } | null>(null);
+  const [editingSale, setEditingSale] = useState<OrderRow | null>(null);
+  const [payingSale, setPayingSale] = useState<OrderRow | null>(null);
+  const [deletingSale, setDeletingSale] = useState<OrderRow | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [saleNotes, setSaleNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
+  const [isMutatingSale, setIsMutatingSale] = useState(false);
 
-  const inRange = (createdAt: string) => {
-    const date = createdAt.slice(0, 10);
-    return date >= startDate && date <= endDate;
-  };
-
-  const fetchOptional = async <T,>(tableName: string, queryFactory: () => PromiseLike<{ data: T[] | null; error: any }>) => {
+  const fetchOptional = async <T,>(
+    tableName: string,
+    queryFactory: () => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>
+  ) => {
     const result = await queryFactory();
     if (result.error) {
       if (String(result.error.message || '').includes(tableName)) return [];
@@ -221,7 +259,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
 
       if (salesOnly) {
         const [ordersRes, serviceOrdersRes] = await Promise.all([
-          supabase.from('orders').select('id, customer_email, customer_name, status, total_amount, payment_date, created_at').order('created_at', { ascending: false }),
+          supabase.from('orders').select('id, customer_email, customer_name, status, total_amount, payment_date, payment_method, sales_channel, notes, created_at').order('created_at', { ascending: false }),
           supabase.from('service_orders').select('id, service_type, status, total_price, created_at').order('created_at', { ascending: false })
         ]);
 
@@ -246,7 +284,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
         quotationRows,
         auditRows
       ] = await Promise.all([
-        supabase.from('orders').select('id, customer_email, customer_name, status, total_amount, payment_date, created_at').order('created_at', { ascending: false }),
+        supabase.from('orders').select('id, customer_email, customer_name, status, total_amount, payment_date, payment_method, sales_channel, notes, created_at').order('created_at', { ascending: false }),
         supabase.from('service_orders').select('id, service_type, status, total_price, created_at').order('created_at', { ascending: false }),
         supabase.from('products').select('id, sku, name, brand, price, cost_price, stock_quantity, min_stock_quantity, stripe_sync_status').order('name', { ascending: true }),
         supabase.from('customers').select('id', { count: 'exact', head: true }),
@@ -282,18 +320,25 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
         customerCount: customerCountRes.count || 0,
         employeeCount: employeeCountRes.count || 0
       });
-    } catch (err: any) {
-      error('Erro ao carregar relatórios', err.message || 'Não foi possível consultar os dados.');
+    } catch (err: unknown) {
+      error('Erro ao carregar relatórios', errorMessage(err, 'Não foi possível consultar os dados.'));
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchReports();
+    // The report is loaded once on mount; filters are applied locally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const scoped = useMemo(() => {
+    const inRange = (createdAt: string) => {
+      const date = createdAt.slice(0, 10);
+      return date >= startDate && date <= endDate;
+    };
     const orders = data.orders.filter((row) => inRange(row.created_at));
     const serviceOrders = data.serviceOrders.filter((row) => inRange(row.created_at));
     const financialManual = data.financial.filter((row) => inRange(row.created_at));
@@ -307,10 +352,10 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
         id: `order-${order.id}`,
         type: 'INCOME',
         status: 'PAID',
-        category: 'Venda Online',
+        category: order.sales_channel === 'COUNTER' ? 'Venda de Balcão' : 'Venda Online',
         description: `Pedido #${order.id.slice(0, 8).toUpperCase()} - ${orderCustomerName(order)}`,
         amount: order.total_amount,
-        payment_method: 'Stripe',
+        payment_method: order.payment_method || (order.sales_channel === 'ONLINE' ? 'Stripe' : null),
         source: 'ORDER',
         created_at: order.payment_date || order.created_at
       }));
@@ -522,6 +567,71 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
     }
   };
 
+  const openEditSale = (order: OrderRow) => {
+    setCustomerName(order.customer_name || '');
+    setCustomerEmail(order.customer_email === 'balcao@tecnomotos.local' ? '' : order.customer_email);
+    setSaleNotes(order.notes || '');
+    setEditingSale(order);
+  };
+
+  const saveSale = async () => {
+    if (!editingSale) return;
+    setIsMutatingSale(true);
+    try {
+      const { error: mutationError } = await supabase.rpc('update_pending_counter_sale', {
+        p_order_id: editingSale.id,
+        p_customer_name: customerName || null,
+        p_customer_email: customerEmail || null,
+        p_notes: saleNotes || null
+      });
+      if (mutationError) throw mutationError;
+      setEditingSale(null);
+      await fetchReports();
+      success('Venda atualizada', 'Os dados da venda foram salvos.');
+    } catch (mutationError) {
+      error('Falha ao editar venda', mutationError instanceof Error ? mutationError.message : 'Não foi possível editar a venda.');
+    } finally {
+      setIsMutatingSale(false);
+    }
+  };
+
+  const confirmSalePayment = async () => {
+    if (!payingSale) return;
+    setIsMutatingSale(true);
+    try {
+      const { error: mutationError } = await supabase.rpc('confirm_counter_sale_payment', {
+        p_order_id: payingSale.id,
+        p_payment_method: paymentMethod
+      });
+      if (mutationError) throw mutationError;
+      setPayingSale(null);
+      await fetchReports();
+      success('Pagamento confirmado', 'A venda foi marcada como paga e a emissão da nota fiscal foi liberada.');
+    } catch (mutationError) {
+      error('Falha ao confirmar pagamento', mutationError instanceof Error ? mutationError.message : 'Não foi possível confirmar o pagamento.');
+    } finally {
+      setIsMutatingSale(false);
+    }
+  };
+
+  const deleteSale = async () => {
+    if (!deletingSale) return;
+    setIsMutatingSale(true);
+    try {
+      const { error: mutationError } = await supabase.rpc('delete_pending_counter_sale', {
+        p_order_id: deletingSale.id
+      });
+      if (mutationError) throw mutationError;
+      setDeletingSale(null);
+      await fetchReports();
+      success('Venda excluída', 'A venda pendente foi removida do relatório.');
+    } catch (mutationError) {
+      error('Falha ao excluir venda', mutationError instanceof Error ? mutationError.message : 'Não foi possível excluir a venda.');
+    } finally {
+      setIsMutatingSale(false);
+    }
+  };
+
   const detailActions = (kind: 'sale' | 'service', id: string) => (
     <div className="flex items-center justify-end gap-2">
       <button
@@ -553,6 +663,54 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
       </button>
     </div>
   );
+
+  const saleActions = (order: OrderRow) => {
+    const isPendingCounterSale = order.sales_channel === 'COUNTER' && order.status === 'pending_payment';
+    const paymentTitle = order.status === 'paid'
+      ? 'Venda já paga'
+      : order.sales_channel === 'ONLINE'
+        ? 'O pagamento da venda online é confirmado pelo provedor'
+        : 'Confirmar pagamento';
+
+    return (
+      <div className="flex min-w-max items-center justify-end gap-2">
+        {detailActions('sale', order.id)}
+        <button
+          type="button"
+          onClick={() => {
+            setPaymentMethod(order.payment_method || 'Dinheiro');
+            setPayingSale(order);
+          }}
+          disabled={!isPendingCounterSale}
+          title={paymentTitle}
+          aria-label={paymentTitle}
+          className="flex h-8 w-8 items-center justify-center border border-emerald-500/40 text-emerald-400 transition-colors hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          <CreditCard className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => openEditSale(order)}
+          disabled={!isPendingCounterSale}
+          title={isPendingCounterSale ? 'Editar venda pendente' : 'Somente vendas de balcão pendentes podem ser editadas'}
+          aria-label="Editar venda"
+          className="flex h-8 w-8 items-center justify-center border border-brand-grey/25 text-brand-grey transition-colors hover:border-brand-red hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setDeletingSale(order)}
+          disabled={!isPendingCounterSale}
+          title={isPendingCounterSale ? 'Excluir venda pendente' : 'Vendas pagas ou online não podem ser excluídas por esta ação'}
+          aria-label="Excluir venda"
+          className="flex h-8 w-8 items-center justify-center border border-brand-red/35 text-brand-red transition-colors hover:bg-brand-red/10 disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  };
 
   const metricCards = [
     { label: 'Receita Comercial', value: money(metrics.salesRevenue), detail: `${metrics.paidOrders} pedidos pagos`, icon: ShoppingBag, tone: 'text-emerald-400' },
@@ -691,10 +849,10 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
                     ...scoped.orders.map((order) => ({
                       código: `Pedido ${order.id.slice(0, 8).toUpperCase()}`,
                       cliente: orderCustomerName(order),
-                      status: order.status,
+                      status: <SaleStatusBadge status={order.status} />,
                       valor: money(asNumber(order.total_amount)),
                       data: new Date(order.created_at).toLocaleDateString('pt-BR'),
-                      ações: detailActions('sale', order.id)
+                      ações: saleActions(order)
                     })),
                     ...scoped.quotations.map((quotation) => ({
                       código: `Orçamento ${quotation.id.slice(0, 8).toUpperCase()}`,
@@ -788,6 +946,96 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
           onClose={() => setSelectedDetail(null)}
         />
       )}
+
+      <Modal
+        isOpen={Boolean(editingSale)}
+        onClose={() => !isMutatingSale && setEditingSale(null)}
+        title={editingSale ? `Editar venda #${editingSale.id.slice(0, 8).toUpperCase()}` : 'Editar venda'}
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="ghost" size="sm" disabled={isMutatingSale} onClick={() => setEditingSale(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" size="sm" disabled={isMutatingSale} onClick={() => void saveSale()}>
+              {isMutatingSale ? 'Salvando...' : 'Salvar alterações'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-xs font-mono text-brand-grey">
+            Os itens e o valor da venda continuam vinculados ao orçamento. Aqui você pode corrigir os dados de identificação da venda pendente.
+          </p>
+          <Input label="Nome do cliente" value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
+          <Input label="E-mail (opcional)" type="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} />
+          <label className="flex flex-col gap-1 text-left">
+            <span className="text-xs font-mono font-bold uppercase tracking-widest text-brand-grey">Observações</span>
+            <textarea
+              value={saleNotes}
+              onChange={(event) => setSaleNotes(event.target.value)}
+              rows={4}
+              className="w-full resize-y border border-brand-grey/20 bg-brand-darkgrey px-4 py-2.5 text-sm text-white outline-none transition-colors focus:border-brand-red focus:ring-1 focus:ring-brand-red"
+            />
+          </label>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(payingSale)}
+        onClose={() => !isMutatingSale && setPayingSale(null)}
+        title={payingSale ? `Pagar venda #${payingSale.id.slice(0, 8).toUpperCase()}` : 'Pagar venda'}
+        size="sm"
+        footer={
+          <>
+            <Button type="button" variant="ghost" size="sm" disabled={isMutatingSale} onClick={() => setPayingSale(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" size="sm" disabled={isMutatingSale} onClick={() => void confirmSalePayment()}>
+              <CreditCard className="h-4 w-4" />
+              {isMutatingSale ? 'Confirmando...' : 'Confirmar pagamento'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="border border-brand-grey/15 bg-brand-black/40 p-3 font-mono text-xs">
+            <span className="text-brand-grey">Valor da venda</span>
+            <strong className="mt-1 block text-lg text-white">{payingSale ? money(asNumber(payingSale.total_amount)) : '-'}</strong>
+          </div>
+          <Select
+            label="Forma de pagamento"
+            value={paymentMethod}
+            onChange={(event) => setPaymentMethod(event.target.value)}
+            options={paymentMethodOptions}
+          />
+          <p className="text-xs text-brand-grey">
+            Ao confirmar, a venda ficará paga, os produtos serão baixados do estoque e a emissão da nota fiscal será liberada.
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(deletingSale)}
+        onClose={() => !isMutatingSale && setDeletingSale(null)}
+        title="Excluir venda pendente"
+        size="sm"
+        footer={
+          <>
+            <Button type="button" variant="ghost" size="sm" disabled={isMutatingSale} onClick={() => setDeletingSale(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="danger" size="sm" disabled={isMutatingSale} onClick={() => void deleteSale()}>
+              <Trash2 className="h-4 w-4" />
+              {isMutatingSale ? 'Excluindo...' : 'Excluir venda'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-brand-silver">
+          A venda #{deletingSale?.id.slice(0, 8).toUpperCase()} será removida permanentemente. Esta ação está disponível somente enquanto a venda estiver pendente.
+        </p>
+      </Modal>
     </div>
   );
 }
