@@ -40,6 +40,13 @@ interface FiscalFormState {
   postalCode: string;
 }
 
+interface FiscalIssue {
+  code: string;
+  message: string;
+  productId?: string;
+  missing?: string[];
+}
+
 const emptyFiscalForm: FiscalFormState = {
   issuerUf: 'MT', deliveryMode: '', taxpayerIndicator: '', purchasePurpose: '',
   recipientName: '', recipientDocument: '', freightMode: '', stateRegistration: '', street: '', number: '',
@@ -83,6 +90,7 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
   const [issuedFiscal, setIssuedFiscal] = useState<{ products?: boolean; services?: boolean }>({});
   const [fiscalForm, setFiscalForm] = useState<FiscalFormState>(emptyFiscalForm);
   const [isLookingUpFiscalCep, setIsLookingUpFiscalCep] = useState(false);
+  const [fiscalIssue, setFiscalIssue] = useState<FiscalIssue | null>(null);
   const baseUrl = kind === 'sale' ? `/api/relatorios/vendas/${id}` : `/api/relatorios/servicos/${id}`;
 
   useEffect(() => {
@@ -217,6 +225,7 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
     }
 
     setEmittingFiscal(documentKind);
+    setFiscalIssue(null);
     try {
       const response = await fetch(documentKind === 'products' ? '/api/fiscal/emit' : '/api/fiscal/emit-service', {
         method: 'POST',
@@ -226,7 +235,17 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
           : { serviceOrderId })
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Não foi possível emitir a nota fiscal.');
+      if (!response.ok) {
+        if (documentKind === 'products' && result.code) {
+          setFiscalIssue({
+            code: String(result.code),
+            message: String(result.error || 'Não foi possível preparar a nota fiscal.'),
+            productId: typeof result.details?.productId === 'string' ? result.details.productId : undefined,
+            missing: Array.isArray(result.details?.missing) ? result.details.missing.map(String) : undefined
+          });
+        }
+        throw new Error(result.error || 'Não foi possível emitir a nota fiscal.');
+      }
 
       setIssuedFiscal((current) => ({ ...current, [documentKind]: true }));
       success(
@@ -368,6 +387,19 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
                         )}
                       </div>
                     </div>
+
+                    {fiscalIssue && (
+                      <div className="flex flex-wrap items-center justify-between gap-3 border border-amber-500/35 bg-amber-500/5 p-3">
+                        <div>
+                          <p className="text-xs font-bold text-amber-300">Configuração fiscal necessária</p>
+                          <p className="mt-1 text-[11px] text-brand-silver">{fiscalIssue.message}</p>
+                          {fiscalIssue.missing?.length ? <p className="mt-1 text-[10px] text-brand-grey">Campos: {fiscalIssue.missing.join(', ')}</p> : null}
+                        </div>
+                        <Button href={`/admin/configuracoes/fiscal?tab=pending${fiscalIssue.productId ? `&product=${encodeURIComponent(fiscalIssue.productId)}` : ''}`} size="sm" variant="secondary">
+                          Configurar produto
+                        </Button>
+                      </div>
+                    )}
 
                     {hasProducts && (
                       <div className="grid grid-cols-1 gap-3 border border-brand-grey/15 bg-brand-black/35 p-4 sm:grid-cols-2 lg:grid-cols-4">

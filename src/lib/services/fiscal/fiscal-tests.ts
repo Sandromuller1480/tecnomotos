@@ -84,8 +84,16 @@ async function runAllTests() {
     assert(resolveFiscalItem(context, product, [approvedRule]).cfop === '5102', 'Regra interna aprovada deve resolver 5102/102');
 
     let pendingBlocked = false;
-    try { resolveFiscalItem(context, { ...product, fiscalStatus: 'pending', fiscalProfileId: null }, [approvedRule]); } catch (error) { pendingBlocked = error instanceof FiscalResolutionError && error.code === 'PRODUCT_PENDING'; }
+    let pendingIdentifiedProfile = false;
+    try { resolveFiscalItem(context, { ...product, fiscalStatus: 'pending', fiscalProfileId: null }, [approvedRule]); } catch (error) {
+      pendingBlocked = error instanceof FiscalResolutionError && error.code === 'PRODUCT_PENDING';
+      pendingIdentifiedProfile = error instanceof FiscalResolutionError
+        && Array.isArray(error.details.missing)
+        && error.details.missing.includes('perfil fiscal aprovado');
+    }
     assert(pendingBlocked, 'Produto sem perfil aprovado deve permanecer pendente e bloquear emissão');
+    assert(pendingIdentifiedProfile, 'Erro de produto pendente deve identificar o perfil fiscal ausente');
+    assert(resolveFiscalItem(context, { ...product, sku: 'SKU-HOMOLOGACAO' }, [approvedRule]).productId === product.id, 'SKU de homologação não deve bloquear emissão');
 
     let conflictBlocked = false;
     try { resolveFiscalItem(context, product, [approvedRule, { ...approvedRule, id: 'rule-conflict', name: 'Conflito' }]); } catch (error) { conflictBlocked = error instanceof FiscalResolutionError && error.code === 'CONFLICTING_RULES'; }

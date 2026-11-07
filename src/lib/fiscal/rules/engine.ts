@@ -90,19 +90,21 @@ export function resolveFiscalItem(
   if (!context.taxpayerIndicator) {
     throw new FiscalResolutionError('INVALID_CONTEXT', 'Confirme a situação de contribuinte do ICMS do cliente.');
   }
-  if (product.fiscalStatus !== 'complete' || !product.fiscalProfileId) {
-    throw new FiscalResolutionError(
-      'PRODUCT_PENDING',
-      `Não foi possível preparar a nota: o produto ${label} ainda não tem perfil fiscal aprovado.`,
-      { productId: product.id }
-    );
-  }
-
   const missing: string[] = [];
   if (!/^\d{8}$/.test(product.ncm || '')) missing.push('NCM');
   if (product.origin === null || product.origin === undefined || product.origin < 0 || product.origin > 8) missing.push('origem');
   if (!product.unit?.trim()) missing.push('unidade comercial');
   if (!product.withoutGtin && !product.gtin) missing.push('GTIN ou indicação sem GTIN');
+  if (!product.fiscalProfileId) missing.push('perfil fiscal aprovado');
+
+  if (product.fiscalStatus !== 'complete' || !product.fiscalProfileId) {
+    throw new FiscalResolutionError(
+      'PRODUCT_PENDING',
+      `Não foi possível preparar a nota: o produto ${label} ainda não tem perfil fiscal aprovado.`,
+      { productId: product.id, missing }
+    );
+  }
+
   if (missing.length) {
     throw new FiscalResolutionError(
       'INCOMPLETE_PRODUCT',
@@ -164,4 +166,3 @@ export function determineDocumentModel(context: Pick<FiscalResolutionContext, 'd
   if (context.destinationScope === 'interstate') return '55';
   return context.nfceEligible ? '65' : '55';
 }
-

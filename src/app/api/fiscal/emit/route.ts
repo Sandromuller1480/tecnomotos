@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { FiscalOperationService } from '@/lib/services/fiscal/FiscalOperationService';
+import { FiscalResolutionError } from '@/lib/fiscal/rules/engine';
 
 export async function POST(request: Request) {
   try {
@@ -92,6 +93,9 @@ export async function POST(request: Request) {
       document: result.document
     });
   } catch (e: unknown) {
+    if (e instanceof FiscalResolutionError) {
+      return NextResponse.json({ error: e.message, code: e.code, details: e.details }, { status: 422 });
+    }
     const errMsg = e instanceof Error ? e.message : 'Erro ao processar emissão fiscal';
     return NextResponse.json({ error: errMsg }, { status: 500 });
   }
