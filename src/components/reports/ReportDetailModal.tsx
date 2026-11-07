@@ -92,6 +92,16 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
   const [isLookingUpFiscalCep, setIsLookingUpFiscalCep] = useState(false);
   const [fiscalIssue, setFiscalIssue] = useState<FiscalIssue | null>(null);
   const baseUrl = kind === 'sale' ? `/api/relatorios/vendas/${id}` : `/api/relatorios/servicos/${id}`;
+  const isRuleIssue = fiscalIssue ? ['NO_RULE', 'CONFLICTING_RULES'].includes(fiscalIssue.code) : false;
+  const issueTitle = isRuleIssue
+    ? fiscalIssue?.code === 'CONFLICTING_RULES' ? 'Regras fiscais conflitantes' : 'Regra da operação não configurada'
+    : 'Dados fiscais do produto pendentes';
+  const issueActionLabel = isRuleIssue
+    ? fiscalIssue?.code === 'CONFLICTING_RULES' ? 'Revisar regras fiscais' : 'Configurar regra fiscal'
+    : 'Configurar produto';
+  const issueActionHref = isRuleIssue
+    ? '/admin/configuracoes/fiscal?tab=rules'
+    : `/admin/configuracoes/fiscal?tab=pending${fiscalIssue?.productId ? `&product=${encodeURIComponent(fiscalIssue.productId)}` : ''}`;
 
   useEffect(() => {
     let active = true;
@@ -391,12 +401,12 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
                     {fiscalIssue && (
                       <div className="flex flex-wrap items-center justify-between gap-3 border border-amber-500/35 bg-amber-500/5 p-3">
                         <div>
-                          <p className="text-xs font-bold text-amber-300">Configuração fiscal necessária</p>
+                          <p className="text-xs font-bold text-amber-300">{issueTitle}</p>
                           <p className="mt-1 text-[11px] text-brand-silver">{fiscalIssue.message}</p>
                           {fiscalIssue.missing?.length ? <p className="mt-1 text-[10px] text-brand-grey">Campos: {fiscalIssue.missing.join(', ')}</p> : null}
                         </div>
-                        <Button href={`/admin/configuracoes/fiscal?tab=pending${fiscalIssue.productId ? `&product=${encodeURIComponent(fiscalIssue.productId)}` : ''}`} size="sm" variant="secondary">
-                          Configurar produto
+                        <Button href={issueActionHref} size="sm" variant="secondary">
+                          {issueActionLabel}
                         </Button>
                       </div>
                     )}
