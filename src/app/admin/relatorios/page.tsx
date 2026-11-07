@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { ReportDetailModal } from '@/components/reports/ReportDetailModal';
+import { EditPendingSaleModal } from '@/components/sales/EditPendingSaleModal';
 import {
   Activity,
   ArrowDownCircle,
@@ -220,9 +221,6 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
   const [editingSale, setEditingSale] = useState<OrderRow | null>(null);
   const [payingSale, setPayingSale] = useState<OrderRow | null>(null);
   const [deletingSale, setDeletingSale] = useState<OrderRow | null>(null);
-  const [customerName, setCustomerName] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [saleNotes, setSaleNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
   const [isMutatingSale, setIsMutatingSale] = useState(false);
 
@@ -568,31 +566,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
   };
 
   const openEditSale = (order: OrderRow) => {
-    setCustomerName(order.customer_name || '');
-    setCustomerEmail(order.customer_email === 'balcao@tecnomotos.local' ? '' : order.customer_email);
-    setSaleNotes(order.notes || '');
     setEditingSale(order);
-  };
-
-  const saveSale = async () => {
-    if (!editingSale) return;
-    setIsMutatingSale(true);
-    try {
-      const { error: mutationError } = await supabase.rpc('update_pending_counter_sale', {
-        p_order_id: editingSale.id,
-        p_customer_name: customerName || null,
-        p_customer_email: customerEmail || null,
-        p_notes: saleNotes || null
-      });
-      if (mutationError) throw mutationError;
-      setEditingSale(null);
-      await fetchReports();
-      success('Venda atualizada', 'Os dados da venda foram salvos.');
-    } catch (mutationError) {
-      error('Falha ao editar venda', mutationError instanceof Error ? mutationError.message : 'Não foi possível editar a venda.');
-    } finally {
-      setIsMutatingSale(false);
-    }
   };
 
   const confirmSalePayment = async () => {
@@ -947,39 +921,12 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
         />
       )}
 
-      <Modal
-        isOpen={Boolean(editingSale)}
-        onClose={() => !isMutatingSale && setEditingSale(null)}
-        title={editingSale ? `Editar venda #${editingSale.id.slice(0, 8).toUpperCase()}` : 'Editar venda'}
-        size="md"
-        footer={
-          <>
-            <Button type="button" variant="ghost" size="sm" disabled={isMutatingSale} onClick={() => setEditingSale(null)}>
-              Cancelar
-            </Button>
-            <Button type="button" size="sm" disabled={isMutatingSale} onClick={() => void saveSale()}>
-              {isMutatingSale ? 'Salvando...' : 'Salvar alterações'}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-xs font-mono text-brand-grey">
-            Os itens e o valor da venda continuam vinculados ao orçamento. Aqui você pode corrigir os dados de identificação da venda pendente.
-          </p>
-          <Input label="Nome do cliente" value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
-          <Input label="E-mail (opcional)" type="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} />
-          <label className="flex flex-col gap-1 text-left">
-            <span className="text-xs font-mono font-bold uppercase tracking-widest text-brand-grey">Observações</span>
-            <textarea
-              value={saleNotes}
-              onChange={(event) => setSaleNotes(event.target.value)}
-              rows={4}
-              className="w-full resize-y border border-brand-grey/20 bg-brand-darkgrey px-4 py-2.5 text-sm text-white outline-none transition-colors focus:border-brand-red focus:ring-1 focus:ring-brand-red"
-            />
-          </label>
-        </div>
-      </Modal>
+      <EditPendingSaleModal
+        open={Boolean(editingSale)}
+        orderId={editingSale?.id || null}
+        onClose={() => setEditingSale(null)}
+        onSaved={fetchReports}
+      />
 
       <Modal
         isOpen={Boolean(payingSale)}

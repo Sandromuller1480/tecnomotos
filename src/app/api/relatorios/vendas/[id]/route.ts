@@ -22,6 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       id,
       customer_email,
       customer_name,
+      customer_phone,
       status,
       quotation_id,
       total_amount,
@@ -110,7 +111,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     customer: {
       name: data.customer_name || profile?.full_name || 'Cliente não identificado',
       email: data.customer_email || profile?.email,
-      phone: profile?.phone,
+      phone: data.customer_phone || profile?.phone,
       document: customer?.document,
       address: address
         ? `${address.street}, ${address.number}${address.complement ? ` - ${address.complement}` : ''}, ${address.neighborhood}, ${address.city}/${address.state} - ${address.postal_code}`
