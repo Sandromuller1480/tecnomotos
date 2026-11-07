@@ -8,6 +8,53 @@ const FOCUS_BASE_URLS: Record<Exclude<FiscalEnvironment, 'mock'>, string> = {
 
 const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
 
+const FOCUS_ITEM_TAX_FIELDS = new Set([
+  'ipi_situacao_tributaria',
+  'ipi_codigo_enquadramento_legal',
+  'ipi_base_calculo',
+  'ipi_aliquota',
+  'ipi_valor',
+  'pis_situacao_tributaria',
+  'pis_base_calculo',
+  'pis_aliquota_porcentual',
+  'pis_valor',
+  'cofins_situacao_tributaria',
+  'cofins_base_calculo',
+  'cofins_aliquota_porcentual',
+  'cofins_valor',
+  'icms_modalidade_base_calculo',
+  'icms_base_calculo',
+  'icms_aliquota',
+  'icms_valor',
+  'icms_base_calculo_retido_st',
+  'icms_valor_retido_st',
+  'fcp_percentual',
+  'fcp_base_calculo',
+  'fcp_valor',
+  'ibs_cbs_situacao_tributaria',
+  'ibs_cbs_classificacao_tributaria',
+  'ibs_cbs_base_calculo',
+  'ibs_uf_aliquota',
+  'ibs_uf_valor',
+  'ibs_mun_aliquota',
+  'ibs_mun_valor',
+  'ibs_valor_total',
+  'cbs_aliquota',
+  'cbs_valor'
+]);
+
+function focusItemTaxParameters(parameters?: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(parameters || {}).filter(([key, value]) => (
+      FOCUS_ITEM_TAX_FIELDS.has(key)
+      && value !== undefined
+      && value !== null
+      && value !== ''
+      && ['string', 'number', 'boolean'].includes(typeof value)
+    ))
+  );
+}
+
 type FocusStatus = string | undefined;
 
 export class FocusNFeProvider implements FiscalProvider {
@@ -179,7 +226,7 @@ export class FocusNFeProvider implements FiscalProvider {
         codigo_produto: item.sku || item.productId || item.id,
         descricao: item.name,
         codigo_ncm: digitsOnly(item.ncm),
-        cest: digitsOnly(item.cest),
+        cest: digitsOnly(item.cest) || undefined,
         cfop: item.cfop,
         unidade_comercial: item.unit,
         quantidade_comercial: item.quantity,
@@ -190,9 +237,9 @@ export class FocusNFeProvider implements FiscalProvider {
         valor_unitario_tributavel: item.unitPrice,
         codigo_barras_comercial: item.gtin || undefined,
         codigo_barras_tributavel: item.gtin || undefined,
-        origem: item.origin,
-        cst_icms: item.cst || undefined,
-        csosn: item.csosn || undefined
+        ...focusItemTaxParameters(item.taxParameters),
+        icms_origem: String(item.origin),
+        icms_situacao_tributaria: item.csosn || item.cst
       })),
       formas_pagamento: [{
         forma_pagamento: paymentCode,

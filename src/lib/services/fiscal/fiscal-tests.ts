@@ -1,6 +1,7 @@
 import { createFiscalProvider, getFiscalRuntimeConfig } from './FiscalProviderFactory';
 import { mapFiscalPaymentMethod } from './FiscalPaymentMapper';
 import { MockFiscalProvider } from './providers/MockFiscalProvider';
+import { FocusNFeProvider } from './providers/FocusNFeProvider';
 import { validateNfceSale } from './validateNfceSale';
 import { FiscalCompanySettings, FiscalSale } from './types';
 import { FiscalResolutionError, FiscalRuleRecord, resolveFiscalItem } from '../../fiscal/rules/engine';
@@ -22,6 +23,8 @@ async function runAllTests() {
   const originalProvider = process.env.FISCAL_PROVIDER;
   const originalEnvironment = process.env.FISCAL_ENVIRONMENT;
   const originalProductionEnabled = process.env.FISCAL_PRODUCTION_ENABLED;
+  const originalHomologationToken = process.env.FOCUS_NFE_HOMOLOGATION_TOKEN;
+  const originalFetch = globalThis.fetch;
 
   try {
     process.env.FISCAL_PROVIDER = 'mock';
@@ -54,7 +57,13 @@ async function runAllTests() {
         fiscalRuleId: 'rule-internal-no-st',
         fiscalRuleVersion: 1,
         origin: 0,
-        unit: 'UN'
+        unit: 'UN',
+        taxParameters: {
+          pis_situacao_tributaria: '08',
+          cofins_situacao_tributaria: '08',
+          ipi_situacao_tributaria: '53',
+          ipi_codigo_enquadramento_legal: '999'
+        }
       }]
     };
 
@@ -69,6 +78,10 @@ async function runAllTests() {
     assert(
       validateNfceSale(company, { ...sale, items: [{ ...sale.items[0], ncm: '' }] }).some((message) => message.includes('NCM')),
       'Produto sem NCM deve bloquear emissao'
+    );
+    assert(
+      validateNfceSale(company, { ...sale, items: [{ ...sale.items[0], taxParameters: {} }] }).some((message) => message.includes('PIS')),
+      'Regra sem CST do PIS deve bloquear emissao antes de chegar a Focus'
     );
 
     console.log('\n3. Validando motor de regras por item...');
@@ -121,7 +134,34 @@ async function runAllTests() {
     assert(result.status === 'authorized', 'MockFiscalProvider deve autorizar sem chamada externa');
     assert(String(result.accessKey).startsWith('MOCK-NFCE-'), 'Mock nao deve gerar chave fiscal real');
 
-    console.log('\n5. Validando factory e bloqueio de producao...');
+    console.log('\n5. Validando payload tributario da Focus...');
+    process.env.FOCUS_NFE_HOMOLOGATION_TOKEN = 'token-de-teste';
+    let focusPayloadBody = '{}';
+    globalThis.fetch = async (_input, init) => {
+      focusPayloadBody = String(init?.body || '{}');
+      return new Response(JSON.stringify({ status: 'autorizado', ref: 'teste-focus' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    };
+    const focusResult = await new FocusNFeProvider('homologation').issueNfce({
+      operationId: '12345678-1234-1234-1234-123456789012',
+      reference: 'tecnomotos-focus-payload-test',
+      environment: 'homologation',
+      company,
+      sale
+    });
+    const focusPayload = JSON.parse(focusPayloadBody) as { items?: Array<Record<string, unknown>> };
+    const focusItem = (focusPayload.items || [])[0];
+    assert(focusResult.status === 'authorized', 'Resposta autorizada da Focus deve ser mapeada');
+    assert(focusItem.icms_origem === '0', 'Origem deve usar o campo icms_origem aceito pela Focus');
+    assert(focusItem.icms_situacao_tributaria === '102', 'CSOSN deve usar icms_situacao_tributaria');
+    assert(focusItem.pis_situacao_tributaria === '08', 'CST PIS da regra deve chegar ao item');
+    assert(focusItem.cofins_situacao_tributaria === '08', 'CST COFINS da regra deve chegar ao item');
+    assert(focusItem.ipi_situacao_tributaria === '53', 'CST IPI da regra deve chegar ao item');
+    globalThis.fetch = originalFetch;
+
+    console.log('\n6. Validando factory e bloqueio de producao...');
     const config = getFiscalRuntimeConfig();
     assert(config.provider === 'mock', 'FISCAL_PROVIDER deve permanecer mock por padrao de teste');
     assert(createFiscalProvider().name === 'mock', 'Factory deve criar MockFiscalProvider em modo mock');
@@ -145,6 +185,8 @@ async function runAllTests() {
     process.env.FISCAL_PROVIDER = originalProvider;
     process.env.FISCAL_ENVIRONMENT = originalEnvironment;
     process.env.FISCAL_PRODUCTION_ENABLED = originalProductionEnabled;
+    process.env.FOCUS_NFE_HOMOLOGATION_TOKEN = originalHomologationToken;
+    globalThis.fetch = originalFetch;
   }
 }
 

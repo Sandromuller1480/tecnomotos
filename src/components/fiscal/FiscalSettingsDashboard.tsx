@@ -21,12 +21,12 @@ type Rule = Row & { id: string; name: string; version: number; status: FiscalSta
 type Product = Row & { id: string; sku: string; name: string; ncm: string | null; cest: string | null; fiscal_origin: number | null; unit: string | null; gtin: string | null; without_gtin: boolean; fiscal_status: 'pending' | 'review_required' | 'complete'; fiscal_review_notes: string | null; fiscal_tax_profile_id: string | null };
 
 interface ProfileForm { id: string | null; name: string; code: string; source: string; validFrom: string; validTo: string; notes: string }
-interface RuleForm { id: string | null; name: string; companyCrt: string; fiscalProfileId: string; documentModel: '55' | '65'; originScope: 'internal' | 'interstate'; destinationScope: 'internal' | 'interstate'; destinationUf: string; taxpayerIndicator: 'contributor' | 'exempt' | 'non_contributor' | 'any'; purchasePurpose: 'resale' | 'final_consumption' | 'any'; cfop: string; taxCodeType: 'csosn' | 'cst'; taxCode: string; taxParameters: string; source: string; validFrom: string; validTo: string }
+interface RuleForm { id: string | null; name: string; companyCrt: string; fiscalProfileId: string; documentModel: '55' | '65'; originScope: 'internal' | 'interstate'; destinationScope: 'internal' | 'interstate'; destinationUf: string; taxpayerIndicator: 'contributor' | 'exempt' | 'non_contributor' | 'any'; purchasePurpose: 'resale' | 'final_consumption' | 'any'; cfop: string; taxCodeType: 'csosn' | 'cst'; taxCode: string; pisCst: string; cofinsCst: string; ipiCst: string; ipiLegalCode: string; taxParameters: string; source: string; validFrom: string; validTo: string }
 interface ProductForm { id: string; name: string; sku: string; profileId: string; ncm: string; cest: string; origin: string; unit: string; gtin: string; withoutGtin: boolean; source: string; notes: string }
 
 const today = () => new Date().toISOString().slice(0, 10);
 const emptyProfile = (): ProfileForm => ({ id: null, name: '', code: '', source: '', validFrom: today(), validTo: '', notes: '' });
-const emptyRule = (crt: string): RuleForm => ({ id: null, name: '', companyCrt: crt, fiscalProfileId: '', documentModel: '65', originScope: 'internal', destinationScope: 'internal', destinationUf: '', taxpayerIndicator: 'non_contributor', purchasePurpose: 'final_consumption', cfop: '', taxCodeType: crt === '1' ? 'csosn' : 'cst', taxCode: '', taxParameters: '{}', source: '', validFrom: today(), validTo: '' });
+const emptyRule = (crt: string): RuleForm => ({ id: null, name: '', companyCrt: crt, fiscalProfileId: '', documentModel: '65', originScope: 'internal', destinationScope: 'internal', destinationUf: '', taxpayerIndicator: 'non_contributor', purchasePurpose: 'final_consumption', cfop: '', taxCodeType: crt === '1' ? 'csosn' : 'cst', taxCode: '', pisCst: '08', cofinsCst: '08', ipiCst: '53', ipiLegalCode: '999', taxParameters: '{}', source: 'Escopo fiscal validado pelo contador em 21/10/2026', validFrom: today(), validTo: '' });
 const tabs: Array<{ id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'company', label: 'Empresa', icon: Building2 }, { id: 'profiles', label: 'Perfis fiscais', icon: FileCheck2 },
   { id: 'rules', label: 'Regras de operação', icon: ListChecks }, { id: 'pending', label: 'Produtos pendentes', icon: PackageSearch },
@@ -107,6 +107,15 @@ export function FiscalSettingsDashboard({ initialTab = 'company', targetProductI
     if (!ruleForm) return;
     let parameters: Record<string, unknown>;
     try { parameters = JSON.parse(ruleForm.taxParameters || '{}') as Record<string, unknown>; } catch { setError('Os parâmetros tributários devem formar um JSON válido.'); return; }
+    parameters = {
+      ...parameters,
+      pis_situacao_tributaria: ruleForm.pisCst,
+      cofins_situacao_tributaria: ruleForm.cofinsCst,
+      ...(ruleForm.ipiCst ? {
+        ipi_situacao_tributaria: ruleForm.ipiCst,
+        ipi_codigo_enquadramento_legal: ruleForm.ipiLegalCode
+      } : {})
+    };
     const ok = await act(supabase.rpc('save_fiscal_rule_draft', { p_id: ruleForm.id, p_name: ruleForm.name, p_company_crt: ruleForm.companyCrt, p_fiscal_profile_id: ruleForm.fiscalProfileId, p_document_model: ruleForm.documentModel, p_origin_scope: ruleForm.originScope, p_destination_scope: ruleForm.destinationScope, p_destination_uf: ruleForm.destinationUf || null, p_taxpayer_indicator: ruleForm.taxpayerIndicator, p_purchase_purpose: ruleForm.purchasePurpose, p_cfop: ruleForm.cfop, p_csosn: ruleForm.taxCodeType === 'csosn' ? ruleForm.taxCode : null, p_cst_icms: ruleForm.taxCodeType === 'cst' ? ruleForm.taxCode : null, p_tax_parameters: parameters, p_source: ruleForm.source, p_valid_from: ruleForm.validFrom, p_valid_to: ruleForm.validTo || null }), 'Rascunho da regra salvo.');
     if (ok) setRuleForm(null);
   };
@@ -159,12 +168,14 @@ function ProfileEditor({ form, saving, setForm, save }: { form: ProfileForm | nu
 function RuleEditor({ form, profiles, saving, setForm, save }: { form: RuleForm | null; profiles: Profile[]; saving: boolean; setForm: (v: RuleForm | null) => void; save: () => void }) {
   if (!form) return null; const set = <K extends keyof RuleForm>(key: K, value: RuleForm[K]) => setForm({ ...form, [key]: value });
   return <Modal isOpen onClose={() => setForm(null)} title={form.id ? 'Editar regra fiscal' : 'Nova regra fiscal'} size="xl" footer={<><Button variant="ghost" onClick={() => setForm(null)}>Cancelar</Button><Button disabled={saving} onClick={save}>Salvar rascunho</Button></>}><div className="grid gap-4 md:grid-cols-3">
+    <div className="md:col-span-3 border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-200"><b>Padrões informados pelo contador:</b> PIS 08, COFINS 08 e IPI 53 para saídas. Confirme abaixo o CFOP e o CSOSN conforme a mercadoria seja sem ou com substituição tributária.</div>
     <Input label="Nome da regra" className="md:col-span-2" value={form.name} onChange={(e) => set('name', e.target.value)} /><Input label="CRT" value={form.companyCrt} onChange={(e) => set('companyCrt', e.target.value.replace(/\D/g, '').slice(0, 1))} />
     <Select label="Perfil aprovado" value={form.fiscalProfileId} options={[{ value: '', label: 'Selecione' }, ...profiles.map((p) => ({ value: p.id, label: `${p.code} · v${p.version}` }))]} onChange={(e) => set('fiscalProfileId', e.target.value)} /><Select label="Modelo" value={form.documentModel} options={[{ value: '65', label: '65 - NFC-e' }, { value: '55', label: '55 - NF-e' }]} onChange={(e) => set('documentModel', e.target.value as RuleForm['documentModel'])} />
     <Select label="Origem" value={form.originScope} options={scopes} onChange={(e) => set('originScope', e.target.value as RuleForm['originScope'])} /><Select label="Destino" value={form.destinationScope} options={scopes} onChange={(e) => set('destinationScope', e.target.value as RuleForm['destinationScope'])} /><Input label="UF específica (opcional)" maxLength={2} value={form.destinationUf} onChange={(e) => set('destinationUf', e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} />
     <Select label="Destinatário" value={form.taxpayerIndicator} options={[{ value: 'non_contributor', label: 'Não contribuinte' }, { value: 'contributor', label: 'Contribuinte' }, { value: 'exempt', label: 'Isento' }, { value: 'any', label: 'Qualquer' }]} onChange={(e) => set('taxpayerIndicator', e.target.value as RuleForm['taxpayerIndicator'])} /><Select label="Finalidade" value={form.purchasePurpose} options={[{ value: 'final_consumption', label: 'Consumo final' }, { value: 'resale', label: 'Revenda' }, { value: 'any', label: 'Qualquer' }]} onChange={(e) => set('purchasePurpose', e.target.value as RuleForm['purchasePurpose'])} />
     <Input label="CFOP" maxLength={4} value={form.cfop} onChange={(e) => set('cfop', e.target.value.replace(/\D/g, ''))} /><Select label="Código ICMS" value={form.taxCodeType} options={[{ value: 'csosn', label: 'CSOSN' }, { value: 'cst', label: 'CST ICMS' }]} onChange={(e) => set('taxCodeType', e.target.value as RuleForm['taxCodeType'])} /><Input label={form.taxCodeType === 'csosn' ? 'CSOSN' : 'CST ICMS'} maxLength={form.taxCodeType === 'csosn' ? 3 : 2} value={form.taxCode} onChange={(e) => set('taxCode', e.target.value.replace(/\D/g, ''))} />
-    <Input label="Válida a partir de" type="date" value={form.validFrom} onChange={(e) => set('validFrom', e.target.value)} /><Input label="Válida até" type="date" value={form.validTo} onChange={(e) => set('validTo', e.target.value)} /><Input label="Fonte contábil" value={form.source} onChange={(e) => set('source', e.target.value)} /><Area label="Parâmetros tributários (JSON)" value={form.taxParameters} onChange={(value) => set('taxParameters', value)} />
+    <Input label="CST PIS" maxLength={2} value={form.pisCst} onChange={(e) => set('pisCst', e.target.value.replace(/\D/g, ''))} /><Input label="CST COFINS" maxLength={2} value={form.cofinsCst} onChange={(e) => set('cofinsCst', e.target.value.replace(/\D/g, ''))} /><Input label="CST IPI (opcional)" maxLength={2} value={form.ipiCst} onChange={(e) => set('ipiCst', e.target.value.replace(/\D/g, ''))} />
+    <Input label="Enquadramento legal do IPI" maxLength={3} value={form.ipiLegalCode} onChange={(e) => set('ipiLegalCode', e.target.value.replace(/\D/g, ''))} /><Input label="Válida a partir de" type="date" value={form.validFrom} onChange={(e) => set('validFrom', e.target.value)} /><Input label="Válida até" type="date" value={form.validTo} onChange={(e) => set('validTo', e.target.value)} /><Input label="Fonte contábil" className="md:col-span-3" value={form.source} onChange={(e) => set('source', e.target.value)} /><Area label="Parâmetros avançados (JSON, opcional)" value={form.taxParameters} onChange={(value) => set('taxParameters', value)} />
   </div></Modal>;
 }
 
@@ -179,7 +190,18 @@ function ProductEditor({ form, profiles, saving, setForm, save, openProfiles }: 
 }
 
 function profileToForm(p: Profile): ProfileForm { return { id: p.id, name: p.name, code: p.code || '', source: p.source || '', validFrom: p.valid_from || today(), validTo: p.valid_to || '', notes: p.notes || '' }; }
-function ruleToForm(r: Rule): RuleForm { return { id: r.id, name: r.name, companyCrt: r.company_crt, fiscalProfileId: r.fiscal_profile_id, documentModel: r.document_model, originScope: r.origin_scope, destinationScope: r.destination_scope, destinationUf: r.destination_uf || '', taxpayerIndicator: r.taxpayer_indicator, purchasePurpose: r.purchase_purpose, cfop: r.cfop, taxCodeType: r.csosn ? 'csosn' : 'cst', taxCode: r.csosn || r.cst_icms || '', taxParameters: JSON.stringify(r.tax_parameters || {}, null, 2), source: r.source || '', validFrom: r.valid_from, validTo: r.valid_to || '' }; }
+function ruleToForm(r: Rule): RuleForm {
+  const parameters = { ...(r.tax_parameters || {}) };
+  const pisCst = String(parameters.pis_situacao_tributaria || '08');
+  const cofinsCst = String(parameters.cofins_situacao_tributaria || '08');
+  const ipiCst = String(parameters.ipi_situacao_tributaria || '53');
+  const ipiLegalCode = String(parameters.ipi_codigo_enquadramento_legal || '999');
+  delete parameters.pis_situacao_tributaria;
+  delete parameters.cofins_situacao_tributaria;
+  delete parameters.ipi_situacao_tributaria;
+  delete parameters.ipi_codigo_enquadramento_legal;
+  return { id: r.id, name: r.name, companyCrt: r.company_crt, fiscalProfileId: r.fiscal_profile_id, documentModel: r.document_model, originScope: r.origin_scope, destinationScope: r.destination_scope, destinationUf: r.destination_uf || '', taxpayerIndicator: r.taxpayer_indicator, purchasePurpose: r.purchase_purpose, cfop: r.cfop, taxCodeType: r.csosn ? 'csosn' : 'cst', taxCode: r.csosn || r.cst_icms || '', pisCst, cofinsCst, ipiCst, ipiLegalCode, taxParameters: JSON.stringify(parameters, null, 2), source: r.source || '', validFrom: r.valid_from, validTo: r.valid_to || '' };
+}
 function productToForm(p: Product): ProductForm { return { id: p.id, name: p.name, sku: p.sku || '', profileId: p.fiscal_tax_profile_id || '', ncm: p.ncm || '', cest: p.cest || '', origin: p.fiscal_origin === null ? '' : String(p.fiscal_origin), unit: p.unit || 'UN', gtin: p.gtin || '', withoutGtin: Boolean(p.without_gtin), source: 'Revisão conforme orientação contábil', notes: p.fiscal_review_notes || '' }; }
 function missingFields(p: Product) { const fields: string[] = []; if (!/^\d{8}$/.test(p.ncm || '')) fields.push('NCM'); if (p.fiscal_origin === null) fields.push('Origem'); if (!p.unit) fields.push('Unidade'); if (!p.without_gtin && !p.gtin) fields.push('GTIN/sem GTIN'); if (!p.fiscal_tax_profile_id) fields.push('Perfil'); return fields.length ? fields : ['Aprovação do perfil']; }
 function Header({ title, note, count, action }: { title: string; note: string; count: number; action?: React.ReactNode }) { return <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-bold uppercase text-white">{title}</h2><p className="text-xs text-brand-grey">{note}</p></div><div className="flex items-center gap-3"><Badge variant="neutral">{count}</Badge>{action}</div></div>; }

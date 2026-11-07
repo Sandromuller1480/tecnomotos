@@ -2,6 +2,7 @@ import { FiscalCompanySettings, FiscalSale } from './types';
 import { mapFiscalPaymentMethod } from './FiscalPaymentMapper';
 
 const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
+const taxCode = (parameters: Record<string, unknown> | undefined, key: string) => String(parameters?.[key] || '').trim();
 
 export function validateNfceSale(company: FiscalCompanySettings, sale: FiscalSale) {
   const errors: string[] = [];
@@ -39,6 +40,23 @@ export function validateNfceSale(company: FiscalCompanySettings, sale: FiscalSal
     if (!item.fiscalRuleId || !item.fiscalRuleVersion) errors.push(`Nao foi possivel preparar a nota porque o produto ${label} nao possui snapshot de regra fiscal.`);
     if (item.origin === null || item.origin === undefined) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui origem fiscal cadastrada.`);
     if (!item.unit) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui unidade fiscal cadastrada.`);
+    if (!/^\d{2}$/.test(taxCode(item.taxParameters, 'pis_situacao_tributaria'))) {
+      errors.push(`Nao foi possivel preparar a nota porque a regra do produto ${label} nao informa a situacao tributaria do PIS.`);
+    }
+    if (!/^\d{2}$/.test(taxCode(item.taxParameters, 'cofins_situacao_tributaria'))) {
+      errors.push(`Nao foi possivel preparar a nota porque a regra do produto ${label} nao informa a situacao tributaria da COFINS.`);
+    }
+    const ipiSituation = taxCode(item.taxParameters, 'ipi_situacao_tributaria');
+    if (ipiSituation && !/^\d{2}$/.test(ipiSituation)) {
+      errors.push(`Nao foi possivel preparar a nota porque a situacao tributaria do IPI do produto ${label} e invalida.`);
+    }
+    if (ipiSituation && !/^\d{3}$/.test(taxCode(item.taxParameters, 'ipi_codigo_enquadramento_legal'))) {
+      errors.push(`Nao foi possivel preparar a nota porque a regra do produto ${label} nao informa o enquadramento legal do IPI.`);
+    }
+    const ibsCbsClassification = taxCode(item.taxParameters, 'ibs_cbs_classificacao_tributaria');
+    if (ibsCbsClassification && !/^\d{3}$/.test(taxCode(item.taxParameters, 'ibs_cbs_situacao_tributaria'))) {
+      errors.push(`Nao foi possivel preparar a nota porque a regra do produto ${label} informa a classificacao IBS/CBS sem o CST correspondente.`);
+    }
   });
 
   return errors;
