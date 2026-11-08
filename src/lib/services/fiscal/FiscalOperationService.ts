@@ -9,6 +9,19 @@ type DatabaseClient = SupabaseClient<any, 'public', any>;
 
 const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
 
+function fiscalErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (!error || typeof error !== 'object') return fallback;
+
+  const source = error as Record<string, unknown>;
+  const detail = [source.message, source.details, source.hint]
+    .find((value) => typeof value === 'string' && value.trim());
+  const code = typeof source.code === 'string' && source.code.trim() ? source.code.trim() : null;
+
+  if (typeof detail === 'string') return code ? `${code}: ${detail}` : detail;
+  return fallback;
+}
+
 export class FiscalOperationService {
   constructor(private readonly db: DatabaseClient) {}
 
@@ -61,7 +74,7 @@ export class FiscalOperationService {
 
       return { document, reused: false };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao emitir NFC-e.';
+      const message = fiscalErrorMessage(error, 'Erro ao emitir NFC-e.');
       try {
         const reconciled = sale.documentModel === '55'
           ? await provider.getNfe(operation.reference)
@@ -77,7 +90,7 @@ export class FiscalOperationService {
       }
       await this.updateOperation(operation.id, 'error', message);
       await this.log('fiscal.issue.error', null, operation.reference, 'error', message);
-      throw error;
+      throw error instanceof Error ? error : new Error(message);
     }
   }
 

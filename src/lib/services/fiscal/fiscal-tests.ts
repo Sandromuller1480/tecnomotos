@@ -158,7 +158,18 @@ async function runAllTests() {
     assert(focusItem.icms_situacao_tributaria === '102', 'CSOSN deve usar icms_situacao_tributaria');
     assert(focusItem.pis_situacao_tributaria === '08', 'CST PIS da regra deve chegar ao item');
     assert(focusItem.cofins_situacao_tributaria === '08', 'CST COFINS da regra deve chegar ao item');
-    assert(focusItem.ipi_situacao_tributaria === '53', 'CST IPI da regra deve chegar ao item');
+    assert(focusItem.ipi_situacao_tributaria === undefined, 'NFC-e modelo 65 nao deve enviar o grupo do IPI');
+
+    await new FocusNFeProvider('homologation').issueNfe({
+      operationId: '12345678-1234-1234-1234-123456789012',
+      reference: 'tecnomotos-nfe-payload-test',
+      environment: 'homologation',
+      company,
+      sale: { ...sale, documentModel: '55' }
+    });
+    const nfePayload = JSON.parse(focusPayloadBody) as { items?: Array<Record<string, unknown>> };
+    const nfeItem = (nfePayload.items || [])[0];
+    assert(nfeItem.ipi_situacao_tributaria === '53', 'NF-e modelo 55 deve manter o CST IPI da regra');
     globalThis.fetch = originalFetch;
 
     console.log('\n6. Validando factory e bloqueio de producao...');

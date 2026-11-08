@@ -4,6 +4,19 @@ import { createClient } from '@/lib/supabase/server';
 import { FiscalOperationService } from '@/lib/services/fiscal/FiscalOperationService';
 import { FiscalResolutionError } from '@/lib/fiscal/rules/engine';
 
+function apiErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  if (!error || typeof error !== 'object') return 'Erro ao processar emissão fiscal';
+
+  const source = error as Record<string, unknown>;
+  const detail = [source.message, source.details, source.hint]
+    .find((value) => typeof value === 'string' && value.trim());
+  const code = typeof source.code === 'string' && source.code.trim() ? source.code.trim() : null;
+
+  if (typeof detail === 'string') return code ? `${code}: ${detail}` : detail;
+  return 'Erro ao processar emissão fiscal';
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -96,7 +109,7 @@ export async function POST(request: Request) {
     if (e instanceof FiscalResolutionError) {
       return NextResponse.json({ error: e.message, code: e.code, details: e.details }, { status: 422 });
     }
-    const errMsg = e instanceof Error ? e.message : 'Erro ao processar emissão fiscal';
+    const errMsg = apiErrorMessage(e);
     return NextResponse.json({ error: errMsg }, { status: 500 });
   }
 }

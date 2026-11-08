@@ -43,10 +43,11 @@ const FOCUS_ITEM_TAX_FIELDS = new Set([
   'cbs_valor'
 ]);
 
-function focusItemTaxParameters(parameters?: Record<string, unknown>) {
+function focusItemTaxParameters(parameters?: Record<string, unknown>, includeIpi = true) {
   return Object.fromEntries(
     Object.entries(parameters || {}).filter(([key, value]) => (
       FOCUS_ITEM_TAX_FIELDS.has(key)
+      && (includeIpi || !key.startsWith('ipi_'))
       && value !== undefined
       && value !== null
       && value !== ''
@@ -237,7 +238,9 @@ export class FocusNFeProvider implements FiscalProvider {
         valor_unitario_tributavel: item.unitPrice,
         codigo_barras_comercial: item.gtin || undefined,
         codigo_barras_tributavel: item.gtin || undefined,
-        ...focusItemTaxParameters(item.taxParameters),
+        // NFC-e (model 65) does not accept the IPI group. The same fiscal
+        // classification remains available when the operation uses NF-e 55.
+        ...focusItemTaxParameters(item.taxParameters, input.sale.documentModel === '55'),
         icms_origem: String(item.origin),
         icms_situacao_tributaria: item.csosn || item.cst
       })),
