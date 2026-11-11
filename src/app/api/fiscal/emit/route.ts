@@ -115,6 +115,16 @@ export async function POST(request: Request) {
     // Product tax codes and recipient context are loaded from the database.
     // Values sent by the browser are intentionally not fiscal authority.
     const result = await fiscalService.issueNfe(orderId);
+    const documentStatus = String(result.document?.status || '').toLowerCase();
+
+    if (['rejected', 'error'].includes(documentStatus)) {
+      return NextResponse.json({
+        error: result.document?.error_message || 'A NF-e foi rejeitada pela Sefaz.',
+        success: false,
+        reused: result.reused,
+        document: result.document
+      }, { status: 422 });
+    }
 
     return NextResponse.json({
       success: true,

@@ -264,9 +264,15 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
       }
 
       setIssuedFiscal((current) => ({ ...current, [documentKind]: true }));
+      const documentStatus = String(result.document?.status || '').toLowerCase();
+      const authorized = ['authorized', 'emitted'].includes(documentStatus);
       success(
-        documentKind === 'products' ? 'Nota de produtos processada' : 'NFS-e processada',
-        result.reused ? 'O documento fiscal já existente foi reutilizado.' : 'Documento fiscal emitido com sucesso.'
+        authorized
+          ? (documentKind === 'products' ? 'Nota de produtos emitida' : 'NFS-e emitida')
+          : 'Emissão fiscal enviada',
+        authorized
+          ? (result.reused ? 'O documento fiscal autorizado já existente foi reutilizado.' : 'Documento fiscal autorizado com sucesso.')
+          : 'A solicitação foi recebida e aguarda autorização da Sefaz.'
       );
       onFiscalIssued?.();
     } catch (emitError) {
