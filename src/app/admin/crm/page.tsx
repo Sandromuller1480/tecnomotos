@@ -237,7 +237,7 @@ export default function AdminCrmPage() {
   const handleCreateInteraction = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!customerId || !subject) {
-      error('Campos Obrigatorios', 'Cliente e assunto sao necessarios.');
+      error('Campos obrigatórios', 'Cliente e assunto são necessários.');
       return;
     }
 
@@ -533,7 +533,7 @@ export default function AdminCrmPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-brand-grey uppercase">Status</label>
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">Situação</label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as CrmStatus)}
@@ -576,7 +576,7 @@ export default function AdminCrmPage() {
                 </div>
 
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-mono text-brand-grey uppercase">Resultado / Proximo Passo</label>
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">Resultado / Próximo passo</label>
                   <textarea
                     rows={2}
                     value={outcome}

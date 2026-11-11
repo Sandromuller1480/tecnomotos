@@ -124,7 +124,7 @@ export default function AdminInventoryPage() {
                   <TableHead>Marca</TableHead>
                   <TableHead>Estoque Atual</TableHead>
                   <TableHead>Estoque Mínimo</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
+                  <TableHead className="text-right">Situação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

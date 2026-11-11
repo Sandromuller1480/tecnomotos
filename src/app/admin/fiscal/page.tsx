@@ -230,7 +230,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro desconhecido na emissão.');
 
-      success('NF-e registrada', result.reused ? 'Documento fiscal ja existente foi reutilizado.' : 'Documento fiscal registrado com sucesso.');
+      success('NF-e registrada', result.reused ? 'Documento fiscal já existente foi reutilizado.' : 'Documento fiscal registrado com sucesso.');
       await loadFiscalData();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Falha na emissão.';
@@ -242,7 +242,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
 
   const handleCheckStatus = async (doc: FiscalDocument) => {
     try {
-      info('Consultando NF-e', `Atualizando status fiscal de ${doc.reference || doc.id}.`);
+      info('Consultando NF-e', `Atualizando a situação fiscal de ${doc.reference || doc.id}.`);
       const response = await fetch('/api/fiscal/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -294,7 +294,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
                   Monitore documentos fiscais e emita notas a partir de pedidos pagos reais
                 </p>
               </div>
-              <Badge variant="neutral">Modo Mock</Badge>
+              <Badge variant="neutral">Modo simulado</Badge>
             </div>
           </div>
 
@@ -326,7 +326,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
           <Card>
             <EmptyState
               title="Nenhum pedido fiscal pendente"
-              description="Pedidos pagos reais que ainda nao possuem documento fiscal aparecerao aqui."
+              description="Pedidos pagos reais que ainda não possuem documento fiscal aparecerão aqui."
             />
           </Card>
         ) : (
@@ -372,7 +372,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
           <Card>
             <EmptyState
               title="Nenhuma nota fiscal emitida"
-              description="Os documentos fiscais reais registrados no banco de dados aparecerao aqui."
+              description="Os documentos fiscais reais registrados no banco de dados aparecerão aqui."
             />
           </Card>
         ) : (
@@ -380,7 +380,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nota / Serie</TableHead>
+                  <TableHead>Nota / Série</TableHead>
                   <TableHead>Situação Sefaz</TableHead>
                   <TableHead>Data de Emissão</TableHead>
                   <TableHead>Documentos</TableHead>

@@ -110,7 +110,7 @@ export default function AdminFinancialPage() {
         id: `order-${order.id}`,
         type: 'INCOME',
         status: 'PAID',
-        category: order.sales_channel === 'COUNTER' ? 'Venda de Balcão' : 'Venda Online',
+        category: order.sales_channel === 'COUNTER' ? 'Venda de balcão' : 'Venda virtual',
         description: `Pedido #${order.id.slice(0, 8).toUpperCase()} - ${order.customer_name || order.customer_email}`,
         amount: parseFloat(String(order.total_amount)) || 0,
         payment_method: order.payment_method || (order.sales_channel === 'ONLINE' ? 'Stripe' : null),
@@ -290,7 +290,7 @@ export default function AdminFinancialPage() {
 
       if (updateErr) throw updateErr;
 
-      success('Financeiro Atualizado', `Lancamento marcado como ${statusLabels[nextStatus]}.`);
+      success('Financeiro atualizado', `Lançamento marcado como ${statusLabels[nextStatus]}.`);
       await fetchFinancialData();
     } catch (err: any) {
       error('Erro ao atualizar', err.message);
@@ -342,7 +342,7 @@ export default function AdminFinancialPage() {
           </div>
           {canCreate ? (
             <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
-              <Plus className="w-4 h-4 mr-1" /> Novo Lancamento
+              <Plus className="w-4 h-4 mr-1" /> Novo lançamento
             </Button>
           ) : (
             <Badge variant="neutral">Financeiro</Badge>
@@ -412,7 +412,7 @@ export default function AdminFinancialPage() {
 
             <div className="flex bg-brand-black p-1 border border-brand-grey/10 rounded font-mono text-[10px] uppercase">
               {[
-                { id: 'ALL', label: 'Status' },
+                { id: 'ALL', label: 'Situação' },
                 { id: 'PENDING', label: 'Pendente' },
                 { id: 'PAID', label: 'Pago' },
                 { id: 'CANCELLED', label: 'Cancelado' }
@@ -460,7 +460,7 @@ export default function AdminFinancialPage() {
                       <span className="font-black text-white uppercase">{entry.description}</span>
                       <Badge variant="neutral" className="text-[9px]">{entry.category}</Badge>
                       <Badge variant="neutral" className="text-[9px]">{sourceLabels[entry.source]}</Badge>
-                      {entry.isAutomatic && <Badge variant="info" className="text-[9px]">Automatico</Badge>}
+                      {entry.isAutomatic && <Badge variant="info" className="text-[9px]">Automático</Badge>}
                     </div>
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] font-mono text-brand-grey">
                       <span>Criado: {new Date(entry.created_at).toLocaleDateString('pt-BR')}</span>
@@ -511,7 +511,7 @@ export default function AdminFinancialPage() {
 
             <div>
               <h3 className="text-lg font-black italic uppercase tracking-tight text-white">
-                Novo Lancamento Financeiro
+                Novo lançamento financeiro
               </h3>
               <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
                 Registre contas a pagar, contas a receber, custos e entradas de caixa
@@ -533,7 +533,7 @@ export default function AdminFinancialPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-brand-grey uppercase">Status</label>
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">Situação</label>
                   <select
                     value={entryStatus}
                     onChange={(e) => setEntryStatus(e.target.value as FinancialStatus)}
@@ -581,7 +581,7 @@ export default function AdminFinancialPage() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono text-brand-grey uppercase">Forma de Pagamento</label>
                   <Input
-                    placeholder="Ex: Pix, dinheiro, cartao, boleto"
+                    placeholder="Ex.: Pix, dinheiro, cartão, boleto"
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                   />
@@ -597,7 +597,7 @@ export default function AdminFinancialPage() {
                 </div>
 
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-[10px] font-mono text-brand-grey uppercase">Observacoes</label>
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">Observações</label>
                   <textarea
                     rows={3}
                     value={notes}
@@ -614,7 +614,7 @@ export default function AdminFinancialPage() {
                   onClick={() => {
                     setIsCreateModalOpen(false);
                     resetForm();
-                    info('Lancamento cancelado', 'Nenhum registro financeiro foi salvo.');
+                    info('Lançamento cancelado', 'Nenhum registro financeiro foi salvo.');
                   }}
                 >
                   CANCELAR

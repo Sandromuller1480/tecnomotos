@@ -16,10 +16,10 @@ export default function PublicStorePage() {
         <div className="telemetry-grid p-8 rounded-lg border border-brand-grey/15 bg-brand-card flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="space-y-4">
             <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-brand-red font-bold">
-              LOJA VIRTUAL PREMIUM
+              LOJA VIRTUAL DE ALTO PADRÃO
             </span>
             <h1 className="text-3xl font-black italic uppercase tracking-tight text-white mt-1">
-              Peças de Alta Performance
+              Peças de Alto Desempenho
             </h1>
             <p className="text-sm text-brand-grey max-w-xl leading-relaxed">
               Equipe sua motocicleta com os melhores escapamentos, pastilhas, amortecedores e pneus de competição. Segurança, potência e entrega expressa.

@@ -492,7 +492,7 @@ export default function CustomerDashboard() {
                     </h3>
                     <EmptyState
                       title="Nenhum pedido realizado"
-                      description="Você ainda não possui pedidos em nossa loja online. Peças esportivas e acessórios premium estarão disponíveis em breve!"
+                      description="Você ainda não possui pedidos em nossa loja virtual. Peças esportivas e acessórios de alto padrão estarão disponíveis em breve!"
                     />
                   </Card>
                 )}

@@ -29,6 +29,13 @@ interface FiscalSettings {
   environment: 'homologation' | 'production';
 }
 
+const sefazStatusLabels: Record<string, string> = {
+  ONLINE: 'disponível',
+  OFFLINE: 'sem conexão',
+  UNAVAILABLE: 'indisponível',
+  UNKNOWN: 'desconhecida'
+};
+
 export default function AdminFiscalSettingsPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -105,10 +112,10 @@ export default function AdminFiscalSettingsPage() {
     if (!settings) return;
 
     // Strict validation to lock production unless confirmed explicitly
-    if (tempEnvironment === 'production' && confirmProdText !== 'PRODUCAO') {
+    if (tempEnvironment === 'production' && confirmProdText.toLocaleUpperCase('pt-BR') !== 'PRODUÇÃO') {
       error(
         'Ação Bloqueada',
-        'Para ativar o ambiente de Produção, você deve digitar "PRODUCAO" no campo de confirmação.'
+        'Para ativar o ambiente de produção, você deve digitar "PRODUÇÃO" no campo de confirmação.'
       );
       return;
     }
@@ -174,7 +181,7 @@ export default function AdminFiscalSettingsPage() {
       if (result.status === 'ONLINE') {
         success('SEFAZ Conectada', 'Serviço operacional e pronto para comunicação.');
       } else {
-        error('SEFAZ Inacessível', `O serviço retornou status: ${result.status}`);
+        error('SEFAZ inacessível', `O serviço retornou a situação: ${sefazStatusLabels[result.status] || result.status}`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro no barramento fiscal.';
@@ -373,7 +380,7 @@ export default function AdminFiscalSettingsPage() {
                       </span>
                     </div>
                     <p className="text-[10px] text-brand-grey leading-normal">
-                      As notas emitidas em produção possuem validade jurídica real na Sefaz-MT. Digite <strong>PRODUCAO</strong> abaixo para autorizar:
+                      As notas emitidas em produção possuem validade jurídica real na Sefaz-MT. Digite <strong>PRODUÇÃO</strong> abaixo para autorizar:
                     </p>
                     <Input
                       placeholder="Confirmar"
@@ -397,7 +404,7 @@ export default function AdminFiscalSettingsPage() {
             {/* Certificado digital status */}
             <Card className="space-y-3">
               <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-grey border-b border-brand-grey/10 pb-2">
-                Status do Certificado Digital A1
+                Situação do certificado digital A1
               </h2>
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-brand-input p-3 rounded border border-brand-grey/10">

@@ -21,7 +21,7 @@ export default function ServiceSalesPage() {
             </span>
             <h3 className="mt-5 text-base font-black uppercase italic text-white">Ordens de serviço</h3>
             <p className="mt-2 text-xs leading-relaxed text-brand-grey">
-              Cadastre o cliente e a motocicleta, descreva o serviço, atribua o mecânico e controle materiais, checklist e andamento.
+              Cadastre o cliente e a motocicleta, descreva o serviço, atribua o mecânico e controle materiais, a lista de verificação e o andamento.
             </p>
           </div>
           <Button href="/admin/oficina" className="mt-6 w-full sm:w-auto">

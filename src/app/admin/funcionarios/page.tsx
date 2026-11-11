@@ -154,12 +154,12 @@ export default function AdminEmployeesPage() {
     }
 
     if (password.length < 6) {
-      error('Senha Invalida', 'A senha deve ter pelo menos 6 caracteres.');
+      error('Senha inválida', 'A senha deve ter pelo menos 6 caracteres.');
       return;
     }
 
     if (password !== confirmPassword) {
-      error('Senha Invalida', 'A senha e a confirmacao precisam ser iguais.');
+      error('Senha inválida', 'A senha e a confirmação precisam ser iguais.');
       return;
     }
 
@@ -247,8 +247,8 @@ export default function AdminEmployeesPage() {
                 <TableHead>E-mail</TableHead>
                 <TableHead>Contato</TableHead>
                 <TableHead>CPF</TableHead>
-                <TableHead>Funcao</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Função</TableHead>
+                <TableHead>Situação</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -267,7 +267,7 @@ export default function AdminEmployeesPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     {isOwner ? (
-                      <Button variant="secondary" size="sm">Gerenciar Permissoes</Button>
+                      <Button variant="secondary" size="sm">Gerenciar permissões</Button>
                     ) : (
                       <span className="text-[11px] font-mono text-brand-grey uppercase">Bloqueado</span>
                     )}
@@ -298,7 +298,7 @@ export default function AdminEmployeesPage() {
                 Registrar Funcionário
               </h3>
               <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
-                Cadastre o operador e defina sua funcao principal
+                Cadastre o operador e defina sua função principal
               </p>
             </div>
 
@@ -333,7 +333,7 @@ export default function AdminEmployeesPage() {
                     <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
                   </div>
                   <div className="space-y-1 md:col-span-2">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Funcao</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Função</label>
                     <select
                       value={employeeFunction}
                       onChange={(e) => setEmployeeFunction(e.target.value as EmployeeFunction)}

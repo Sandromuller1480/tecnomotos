@@ -153,7 +153,16 @@ function SaleStatusBadge({ status }: { status: string }) {
   if (status === 'pending_payment') return <Badge variant="warning">Venda pendente</Badge>;
   if (status === 'payment_failed') return <Badge variant="danger">Pagamento falhou</Badge>;
   if (status === 'expired') return <Badge variant="neutral">Venda expirada</Badge>;
-  return <Badge variant="neutral">{status}</Badge>;
+  return <Badge variant="neutral">{translatedStatus(status)}</Badge>;
+}
+
+function translatedStatus(status: string) {
+  const labels: Record<string, string> = {
+    PENDING: 'Pendente', PAID: 'Pago', CANCELLED: 'Cancelado', COMPLETED: 'Concluído',
+    IN_PROGRESS: 'Em andamento', DRAFT: 'Rascunho', SENT: 'Enviado', APPROVED: 'Aprovado',
+    REJECTED: 'Rejeitado', EXPIRED: 'Expirado', synced: 'Sincronizado', pending: 'Pendente', failed: 'Falhou'
+  };
+  return labels[status] || status;
 }
 
 const paymentMethodOptions = [
@@ -350,7 +359,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
         id: `order-${order.id}`,
         type: 'INCOME',
         status: 'PAID',
-        category: order.sales_channel === 'COUNTER' ? 'Venda de Balcão' : 'Venda Online',
+        category: order.sales_channel === 'COUNTER' ? 'Venda de balcão' : 'Venda virtual',
         description: `Pedido #${order.id.slice(0, 8).toUpperCase()} - ${orderCustomerName(order)}`,
         amount: order.total_amount,
         payment_method: order.payment_method || (order.sales_channel === 'ONLINE' ? 'Stripe' : null),
@@ -643,7 +652,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
     const paymentTitle = order.status === 'paid'
       ? 'Venda já paga'
       : order.sales_channel === 'ONLINE'
-        ? 'O pagamento da venda online é confirmado pelo provedor'
+        ? 'O pagamento da venda virtual é confirmado pelo provedor'
         : 'Confirmar pagamento';
 
     return (
@@ -676,7 +685,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
           type="button"
           onClick={() => setDeletingSale(order)}
           disabled={!isPendingCounterSale}
-          title={isPendingCounterSale ? 'Excluir venda pendente' : 'Vendas pagas ou online não podem ser excluídas por esta ação'}
+          title={isPendingCounterSale ? 'Excluir venda pendente' : 'Vendas pagas ou virtuais não podem ser excluídas por esta ação'}
           aria-label="Excluir venda"
           className="flex h-8 w-8 items-center justify-center border border-brand-red/35 text-brand-red transition-colors hover:bg-brand-red/10 disabled:cursor-not-allowed disabled:opacity-35"
         >
@@ -690,8 +699,8 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
     { label: 'Receita Comercial', value: money(metrics.salesRevenue), detail: `${metrics.paidOrders} pedidos pagos`, icon: ShoppingBag, tone: 'text-emerald-400' },
     { label: 'Receita Oficina', value: money(metrics.workshopRevenue), detail: `${metrics.serviceOpen} OS em aberto`, icon: Wrench, tone: 'text-sky-400' },
     { label: 'Saldo Financeiro', value: money(metrics.netCash), detail: `${money(metrics.income)} entradas`, icon: metrics.netCash >= 0 ? ArrowUpCircle : ArrowDownCircle, tone: metrics.netCash >= 0 ? 'text-emerald-400' : 'text-brand-red' },
-    { label: 'Valor em Estoque', value: money(metrics.inventoryValue), detail: `${metrics.lowStockCount} produtos no minimo`, icon: Package, tone: 'text-yellow-500' },
-    { label: 'Orcamentos', value: money(metrics.quoteTotal), detail: `${metrics.approvedQuotes} aprovados`, icon: ClipboardList, tone: 'text-blue-400' },
+    { label: 'Valor em estoque', value: money(metrics.inventoryValue), detail: `${metrics.lowStockCount} produtos no mínimo`, icon: Package, tone: 'text-yellow-500' },
+    { label: 'Orçamentos', value: money(metrics.quoteTotal), detail: `${metrics.approvedQuotes} aprovados`, icon: ClipboardList, tone: 'text-blue-400' },
     { label: 'Auditoria', value: String(scoped.audits.length), detail: 'logs no período', icon: ShieldCheck, tone: 'text-brand-grey' }
   ];
 
@@ -753,7 +762,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
           <div className="flex flex-wrap items-center gap-3">
             <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="w-40 text-xs font-mono" />
             <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className="w-40 text-xs font-mono" />
-            <Badge variant="neutral">Periodo Real</Badge>
+            <Badge variant="neutral">Período real</Badge>
           </div>
         </div>
 
@@ -807,7 +816,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
                   <MetricLine label="Produtos cadastrados" value={data.products.length} />
                 </ReportPanel>
                 <ReportPanel title="Alertas Inteligentes">
-                  <AlertLine tone={metrics.lowStockCount > 0 ? 'warning' : 'success'} text={`${metrics.lowStockCount} produto(s) com estoque no minimo.`} />
+                  <AlertLine tone={metrics.lowStockCount > 0 ? 'warning' : 'success'} text={`${metrics.lowStockCount} produto(s) com estoque no mínimo.`} />
                   <AlertLine tone={metrics.serviceOpen > 0 ? 'warning' : 'success'} text={`${metrics.serviceOpen} ordem(ns) de serviço pendentes ou em andamento.`} />
                   <AlertLine tone={metrics.netCash >= 0 ? 'success' : 'danger'} text={`Saldo consolidado do período: ${money(metrics.netCash)}.`} />
                   <AlertLine tone="info" text={`${scoped.quotations.length} orçamento(s) consultados no período.`} />
@@ -831,7 +840,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
                     ...scoped.quotations.map((quotation) => ({
                       código: `Orçamento ${quotation.id.slice(0, 8).toUpperCase()}`,
                       cliente: quotation.customer_name || 'Sem cliente',
-                      status: quotation.status,
+                      status: translatedStatus(quotation.status),
                       valor: money(asNumber(quotation.total_amount)),
                       data: new Date(quotation.created_at).toLocaleDateString('pt-BR')
                     }))
@@ -847,7 +856,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
                   rows={scoped.serviceOrders.map((order) => ({
                     código: `OS ${order.id.slice(0, 8).toUpperCase()}`,
                     serviço: order.service_type,
-                    status: order.status,
+                    status: translatedStatus(order.status),
                     valor: money(asNumber(order.total_price)),
                     data: new Date(order.created_at).toLocaleDateString('pt-BR'),
                     ações: detailActions('service', order.id)
@@ -888,7 +897,7 @@ export function ReportsWorkspace({ embedded = false, salesOnly = false }: AdminR
                     estoque: product.stock_quantity || 0,
                     minimo: product.min_stock_quantity || 0,
                     valor: money(asNumber(product.price) * (product.stock_quantity || 0)),
-                    stripe: product.stripe_sync_status || 'pendente'
+                    stripe: translatedStatus(product.stripe_sync_status || 'pending')
                   }))}
                 />
               </ReportPanel>

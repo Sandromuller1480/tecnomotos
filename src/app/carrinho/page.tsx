@@ -133,7 +133,7 @@ export default function CartPage() {
             </div>
             <h3 className="font-bold text-white uppercase text-sm tracking-wider">Seu carrinho está vazio</h3>
             <p className="text-xs text-brand-grey max-w-sm mx-auto">
-              Navegue pelo nosso catálogo de peças e componentes de alta performance e adicione itens ao seu carrinho.
+              Navegue pelo nosso catálogo de peças e componentes de alto desempenho e adicione itens ao seu carrinho.
             </p>
             <Button variant="primary" size="sm" href="/produtos">
               Ver Catálogo

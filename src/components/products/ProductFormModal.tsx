@@ -173,9 +173,9 @@ export function ProductFormModal(props: ProductFormModalProps) {
           </div>
         </Section>
 
-        <Section title="D. Loja online e imagem">
+        <Section title="D. Loja virtual e imagem">
           <label className="md:col-span-2 flex cursor-pointer items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-            <input type="checkbox" checked={props.value.showInStore} onChange={(e) => props.onChange('showInStore', e.target.checked)} /> Disponibilizar produto na loja online
+            <input type="checkbox" checked={props.value.showInStore} onChange={(e) => props.onChange('showInStore', e.target.checked)} /> Disponibilizar produto na loja virtual
           </label>
           <div className="md:col-span-2 space-y-2">
             <label className="text-xs font-bold uppercase tracking-widest text-brand-grey">Imagem do produto</label>

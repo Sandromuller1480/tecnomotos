@@ -856,7 +856,7 @@ export default function AdminQuotationsPage() {
                 <TableHead>Cliente</TableHead>
                 <TableHead>Veículo</TableHead>
                 <TableHead>Total</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Situação</TableHead>
                 <TableHead>Validade</TableHead>
                 <TableHead className="w-[120px] text-right 2xl:w-72">Ações</TableHead>
               </TableRow>
@@ -1173,7 +1173,7 @@ export default function AdminQuotationsPage() {
                   <Input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-brand-grey uppercase">Status</label>
+                  <label className="text-[10px] font-mono text-brand-grey uppercase">Situação</label>
                   <select
                     value={status}
                     onChange={(event) => setStatus(event.target.value as QuotationStatus)}

@@ -62,6 +62,14 @@ interface ServiceOrder {
 const money = (value: number | string) =>
   (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+const fiscalStatusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    pending: 'Pendente', processing: 'Processando', authorized: 'Autorizado', rejected: 'Rejeitado',
+    cancelled: 'Cancelado', error: 'Erro', EMITTED: 'Emitido', CANCELLED: 'Cancelado', ERROR: 'Erro'
+  };
+  return labels[status] || status;
+};
+
 const customerProfile = (serviceOrder: ServiceOrder) => {
   const customer = Array.isArray(serviceOrder.customer) ? serviceOrder.customer[0] : serviceOrder.customer;
   return Array.isArray(customer?.profiles) ? customer.profiles[0] : customer?.profiles;
@@ -187,7 +195,7 @@ export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao consultar NFS-e.');
-      success('Situação atualizada', `NFS-e ${result.document.status}.`);
+      success('Situação atualizada', `NFS-e ${fiscalStatusLabel(result.document.status)}.`);
       await loadFiscalData();
     } catch (statusError) {
       error('Consulta fiscal falhou', statusError instanceof Error ? statusError.message : 'Falha na consulta.');
@@ -206,7 +214,7 @@ export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao cancelar NFS-e.');
-      success('NFS-e cancelada', `Documento fiscal: ${result.document.status}.`);
+      success('NFS-e cancelada', `Documento fiscal: ${fiscalStatusLabel(result.document.status)}.`);
       await loadFiscalData();
     } catch (cancelError) {
       error('Cancelamento fiscal falhou', cancelError instanceof Error ? cancelError.message : 'Falha no cancelamento.');
@@ -226,7 +234,7 @@ export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }
                   Emita notas de prestação de serviço a partir de ordens concluídas
                 </p>
               </div>
-              <Badge variant="neutral">Modo Mock</Badge>
+              <Badge variant="neutral">Modo simulado</Badge>
             </div>
           </div>
 

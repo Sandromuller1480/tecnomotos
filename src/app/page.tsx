@@ -57,11 +57,11 @@ export default async function HomePage() {
           {/* Text and Actions */}
           <div className="max-w-xl text-left space-y-6">
             <Badge variant="danger" className="animate-pulse">
-              MotoGP Heritage & Performance
+              Tradição e desempenho MotoGP
             </Badge>
             
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-black italic uppercase tracking-tighter leading-none text-white">
-              PERFORMANCE <br />
+              DESEMPENHO <br />
               PARA SUA <span className="text-brand-red">MOTO</span>
             </h1>
             
@@ -82,12 +82,12 @@ export default async function HomePage() {
           <div className="w-full max-w-md bg-brand-card border border-brand-grey/20 p-6 shadow-2xl relative skew-x-[-4deg]">
             <div className="skew-x-[4deg] space-y-4">
               <div className="flex justify-between items-center border-b border-brand-grey/15 pb-2">
-                <span className="text-[10px] font-mono text-brand-grey tracking-widest uppercase">DADOS DO CATALOGO</span>
+                <span className="text-[10px] font-mono text-brand-grey tracking-widest uppercase">DADOS DO CATÁLOGO</span>
                 <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-brand-black/40 p-3 border border-brand-grey/10 font-mono">
-                  <p className="text-[9px] text-brand-grey">PRODUTOS VISIVEIS</p>
+                  <p className="text-[9px] text-brand-grey">PRODUTOS VISÍVEIS</p>
                   <p className="text-2xl font-black text-white italic">{featuredProducts.length}</p>
                 </div>
                 <div className="bg-brand-black/40 p-3 border border-brand-grey/10 font-mono">
@@ -171,13 +171,13 @@ export default async function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 text-left">
             <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-brand-red font-bold">
-              ENGENHARIA MECÂNICA PREMIUM
+              ENGENHARIA MECÂNICA DE ALTO PADRÃO
             </span>
             <h2 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tight text-white leading-none">
               Centro de Serviços Avançados
             </h2>
             <p className="text-sm text-brand-grey leading-relaxed">
-              Nossa oficina conta com maquinário de telemetria, diagnóstico computadorizado de injeção eletrônica e profissionais especializados em superbikes e motos de alta performance.
+              Nossa oficina conta com maquinário de telemetria, diagnóstico computadorizado de injeção eletrônica e profissionais especializados em superbikes e motos de alto desempenho.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex gap-3">

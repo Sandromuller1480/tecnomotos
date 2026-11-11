@@ -21,6 +21,14 @@ interface ReportDetailModalProps {
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateTime = (value?: string | null) => value ? new Date(value).toLocaleString('pt-BR') : '-';
+const statusLabel = (value: string) => {
+  const labels: Record<string, string> = {
+    paid: 'Pago', pending_payment: 'Pagamento pendente', payment_failed: 'Falha no pagamento', expired: 'Expirado',
+    PENDING: 'Pendente', IN_PROGRESS: 'Em andamento', COMPLETED: 'Concluído', CANCELLED: 'Cancelado',
+    OK: 'OK', ATTENTION: 'Atenção', DAMAGED: 'Avariado', NOT_APPLICABLE: 'Não se aplica'
+  };
+  return labels[value] || value;
+};
 const BRAZILIAN_UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 
 interface FiscalFormState {
@@ -322,7 +330,7 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                  <Badge variant={detail.status === 'paid' || detail.status === 'COMPLETED' ? 'success' : 'neutral'}>{detail.status}</Badge>
+                  <Badge variant={detail.status === 'paid' || detail.status === 'COMPLETED' ? 'success' : 'neutral'}>{statusLabel(detail.status)}</Badge>
                   <span className="text-xl font-black italic text-white">{money(detail.total)}</span>
                 </div>
                 <div className="flex flex-col items-stretch gap-2 sm:items-end">
@@ -573,8 +581,8 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
                     <DetailTable headers={['SKU', 'Produto', 'Qtd.', 'Unitário', 'Total']} rows={detail.products.map((item) => [item.sku || '-', item.name, item.quantity, money(item.unitPrice), money(item.total)])} />
                   </section>
                   <section>
-                    <h4 className="mb-3 text-[10px] font-mono font-black uppercase tracking-[0.2em] text-brand-red">Checklist técnico</h4>
-                    <DetailTable headers={['Item', 'Situação', 'Observações']} rows={detail.checklist.map((item) => [item.label, item.status, item.notes || '-'])} />
+                    <h4 className="mb-3 text-[10px] font-mono font-black uppercase tracking-[0.2em] text-brand-red">Lista de verificação técnica</h4>
+                    <DetailTable headers={['Item', 'Situação', 'Observações']} rows={detail.checklist.map((item) => [item.label, statusLabel(item.status), item.notes || '-'])} />
                   </section>
                   {detail.photos.length > 0 && (
                     <section>

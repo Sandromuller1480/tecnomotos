@@ -10,7 +10,7 @@ export function Footer() {
         <div className="space-y-4">
           <Logo />
           <p className="font-sans leading-relaxed text-brand-grey/80 mt-2">
-            Performance para sua moto. Peças, acessórios e soluções para quem exige desempenho máximo.
+            Desempenho para sua moto. Peças, acessórios e soluções para quem exige o máximo.
           </p>
         </div>
 
@@ -37,7 +37,7 @@ export function Footer() {
             </li>
             <li>
               <Link href="/produtos?cat=pneus" className="hover:text-brand-red transition-colors">
-                Pneus High-Performance
+                Pneus de alto desempenho
               </Link>
             </li>
           </ul>

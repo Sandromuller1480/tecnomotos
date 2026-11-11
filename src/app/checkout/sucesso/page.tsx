@@ -112,7 +112,7 @@ export default function CheckoutSuccessPage() {
             <div className="bg-brand-black border border-brand-grey/10 rounded p-5 text-left font-mono text-xs space-y-4">
               <div className="border-b border-brand-grey/10 pb-3 flex justify-between items-center text-brand-grey text-[10px]">
                 <span>PEDIDO: #{order.id.slice(0, 8).toUpperCase()}</span>
-                <span>STATUS: PAID</span>
+                <span>SITUAÇÃO: PAGO</span>
               </div>
 
               <div className="space-y-3">

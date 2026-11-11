@@ -15,10 +15,10 @@ export default function PublicOficinaPage() {
         {/* Intro */}
         <div>
           <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-brand-red font-bold">
-            OFICINA PREMIUM
+            OFICINA DE ALTO PADRÃO
           </span>
           <h1 className="text-3xl font-black italic uppercase tracking-tight text-white mt-1">
-            Centro de Serviços de Alta Performance
+            Centro de Serviços de Alto Desempenho
           </h1>
           <p className="text-sm text-brand-grey max-w-xl mt-2 leading-relaxed">
             Equipamentos de telemetria e diagnóstico computadorizado de última geração. Cuidamos da mecânica, injeção e acerto dinâmico de pistas para a sua superbike.
@@ -31,7 +31,7 @@ export default function PublicOficinaPage() {
             <Wrench className="w-8 h-8 text-brand-red" />
             <h3 className="text-sm font-bold uppercase tracking-wider text-white">Revisão Periódica</h3>
             <p className="text-xs text-brand-grey leading-relaxed">
-              Checklist completo de mais de 50 itens de mecânica, reaperto dinâmico de chassi e troca de fluídos homologados.
+              Lista de verificação completa com mais de 50 itens de mecânica, reaperto dinâmico de chassi e troca de fluidos homologados.
             </p>
           </Card>
 
@@ -66,7 +66,7 @@ export default function PublicOficinaPage() {
             <Flame className="w-8 h-8 text-brand-red" />
             <h3 className="text-lg font-black italic uppercase tracking-wider text-white">Agende o Serviço da sua Moto</h3>
             <p className="text-xs text-brand-grey max-w-md leading-relaxed">
-              Acesse a área do cliente para cadastrar sua moto e acompanhar em tempo real o andamento de peças e checklists da ordem de serviço.
+              Acesse a área do cliente para cadastrar sua moto e acompanhar em tempo real o andamento de peças e listas de verificação da ordem de serviço.
             </p>
           </div>
           <Button variant="primary" size="lg" href="/login">

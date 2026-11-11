@@ -702,7 +702,7 @@ export default function AdminCustomersPage() {
                 <TableHead>E-mail</TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>Documento</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Situação</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -722,7 +722,7 @@ export default function AdminCustomersPage() {
                     {c.status === 'ACTIVE' ? (
                       <Badge variant="success" className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">ATIVO</Badge>
                     ) : (
-                      <Badge variant="danger" className="text-[9px]">{c.status}</Badge>
+                      <Badge variant="danger" className="text-[9px]">{c.status === 'INACTIVE' ? 'INATIVO' : c.status === 'BLOCKED' ? 'BLOQUEADO' : c.status}</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -876,7 +876,7 @@ export default function AdminCustomersPage() {
                 Cadastrar Novo Cliente
               </h3>
               <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
-                Cadastro exclusivo do balcão, sem acesso à loja online
+                Cadastro exclusivo do balcão, sem acesso à loja virtual
               </p>
             </div>
 
@@ -1129,7 +1129,7 @@ export default function AdminCustomersPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-brand-grey uppercase">Status da Conta</label>
+                    <label className="text-[10px] font-mono text-brand-grey uppercase">Situação da conta</label>
                     <select
                       value={eStatus}
                       onChange={(e) => setEStatus(e.target.value)}
@@ -1199,7 +1199,7 @@ export default function AdminCustomersPage() {
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-brand-grey uppercase">CEP {isLookingUpCep && '(consultando...)'}</label>
                       <Input
-                        placeholder="Somente numeros"
+                        placeholder="Somente números"
                         value={addrPostalCode}
                         onChange={(e) => void handleAddressCepChange(e.target.value)}
                         inputMode="numeric"

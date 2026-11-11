@@ -128,11 +128,11 @@ const DEFAULT_CHECKLIST_ITEMS: ChecklistItem[] = [
   { label: 'Manetes e pedais', status: 'OK', notes: '', sort_order: 3 },
   { label: 'Pneus e rodas', status: 'OK', notes: '', sort_order: 4 },
   { label: 'Freios', status: 'OK', notes: '', sort_order: 5 },
-  { label: 'Corrente, coroa e pinhao', status: 'OK', notes: '', sort_order: 6 },
+  { label: 'Corrente, coroa e pinhão', status: 'OK', notes: '', sort_order: 6 },
   { label: 'Luzes, setas e painel', status: 'OK', notes: '', sort_order: 7 },
   { label: 'Vazamentos aparentes', status: 'OK', notes: '', sort_order: 8 },
-  { label: 'Nivel de combustivel', status: 'OK', notes: '', sort_order: 9 },
-  { label: 'Acessorios e bau', status: 'OK', notes: '', sort_order: 10 }
+  { label: 'Nível de combustível', status: 'OK', notes: '', sort_order: 9 },
+  { label: 'Acessórios e baú', status: 'OK', notes: '', sort_order: 10 }
 ];
 
 export default function AdminWorkshopPage() {
@@ -418,7 +418,7 @@ export default function AdminWorkshopPage() {
     const quantity = parseFloat(selectedProductQuantity.replace(',', '.')) || 0;
 
     if (!product || quantity <= 0) {
-      error('Produto obrigatorio', 'Selecione um produto e informe uma quantidade valida.');
+      error('Produto obrigatório', 'Selecione um produto e informe uma quantidade válida.');
       return;
     }
 
@@ -720,11 +720,11 @@ export default function AdminWorkshopPage() {
         COMPLETED: 'Concluída',
         CANCELLED: 'Cancelada'
       };
-      success('Status Atualizado', `Ordem de serviço movida para ${statusLabels[status]}.`);
+      success('Situação atualizada', `Ordem de serviço movida para ${statusLabels[status]}.`);
       setIsDetailModalOpen(false);
       await fetchServiceOrders();
     } catch (err: any) {
-      error('Erro ao atualizar status', err.message);
+      error('Erro ao atualizar a situação', err.message);
     }
   };
 
@@ -752,7 +752,7 @@ export default function AdminWorkshopPage() {
               Oficina Mecânica
             </h1>
             <p className="text-xs text-brand-grey uppercase tracking-widest font-mono mt-1">
-              Controle ordens de serviço, checklist de entrada e mecânicos alocados
+              Controle ordens de serviço, listas de verificação de entrada e mecânicos alocados
             </p>
           </div>
           {isOwner && (
@@ -822,7 +822,7 @@ export default function AdminWorkshopPage() {
                 <TableHead>Serviço Solicitado</TableHead>
                 <TableHead>Mecânico Alocado</TableHead>
                 <TableHead>Valor</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Situação</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -895,7 +895,7 @@ export default function AdminWorkshopPage() {
                 Nova Ordem de Serviço
               </h3>
               <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
-                Gere check-ins de oficina e associe mecânicos especialistas
+                Registre entradas na oficina e associe mecânicos especialistas
               </p>
             </div>
 
@@ -972,7 +972,7 @@ export default function AdminWorkshopPage() {
                 <div className="space-y-3 md:col-span-2 border border-brand-grey/15 bg-brand-black/40 p-3">
                   <div className="flex items-center justify-between border-b border-brand-grey/10 pb-2">
                     <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                      <Plus className="w-4 h-4 text-brand-red" /> Produto da Ordem de Servico
+                      <Plus className="w-4 h-4 text-brand-red" /> Produto da ordem de serviço
                     </h4>
                     <span className="text-[10px] font-mono text-brand-grey">
                       Total em produtos: R$ {serviceOrderProducts.reduce((sum, item) => sum + item.total_price, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -1051,7 +1051,7 @@ export default function AdminWorkshopPage() {
                 </div>
                 <div className="space-y-3 md:col-span-2 border-t border-brand-grey/10 pt-4">
                   <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4 text-brand-red" /> Checklist de Entrada
+                    <ClipboardList className="w-4 h-4 text-brand-red" /> Lista de verificação de entrada
                   </h4>
                   <div className="space-y-2">
                     {checklistItems.map((item, index) => (
@@ -1063,9 +1063,9 @@ export default function AdminWorkshopPage() {
                           className="w-full text-[10px] font-mono bg-brand-black border border-brand-grey/25 text-white rounded px-2 py-2 focus:outline-none focus:border-brand-red"
                         >
                           <option value="OK">OK</option>
-                          <option value="ATTENTION">ATENCAO</option>
+                          <option value="ATTENTION">ATENÇÃO</option>
                           <option value="DAMAGED">AVARIADO</option>
-                          <option value="NOT_APPLICABLE">NAO APLICA</option>
+                          <option value="NOT_APPLICABLE">NÃO SE APLICA</option>
                         </select>
                         <Input
                           placeholder="Observacao"
@@ -1130,7 +1130,7 @@ export default function AdminWorkshopPage() {
               ORDEM DE SERVIÇO CADASTRADA COM SUCESSO!
             </h3>
             <p className="text-[11px] text-brand-grey leading-normal">
-              A ordem de serviço foi registrada com o status PENDENTE no sistema.
+              A ordem de serviço foi registrada como PENDENTE no sistema.
             </p>
           </div>
         </div>
@@ -1157,7 +1157,7 @@ export default function AdminWorkshopPage() {
                   OS #{selectedSO.id.slice(0, 8).toUpperCase()}
                 </h3>
                 <p className="text-[10px] text-brand-grey font-mono uppercase tracking-widest mt-1">
-                  Gerencie o status e atualize o checklist de manutenção
+                  Gerencie a situação e atualize a lista de verificação da manutenção
                 </p>
               </div>
               <div className="text-right">
@@ -1179,7 +1179,7 @@ export default function AdminWorkshopPage() {
             {/* QUICK STATUS TRANSITIONS */}
             <div className="bg-brand-black p-4 border border-brand-grey/10 rounded space-y-3">
               <h4 className="text-[10px] font-mono font-bold uppercase text-brand-grey tracking-wider">
-                Ações Rápidas de Status:
+                Ações rápidas de situação:
               </h4>
               <div className="flex flex-wrap gap-2">
                 {selectedSO.status === 'PENDING' && (
@@ -1271,7 +1271,7 @@ export default function AdminWorkshopPage() {
                 <div className="space-y-3 md:col-span-2 border border-brand-grey/15 bg-brand-black/40 p-3">
                   <div className="flex items-center justify-between border-b border-brand-grey/10 pb-2">
                     <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                      <Plus className="w-4 h-4 text-brand-red" /> Produto da Ordem de Servico
+                      <Plus className="w-4 h-4 text-brand-red" /> Produto da ordem de serviço
                     </h4>
                     <span className="text-[10px] font-mono text-brand-grey">
                       Total em produtos: R$ {serviceOrderProducts.reduce((sum, item) => sum + item.total_price, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -1348,7 +1348,7 @@ export default function AdminWorkshopPage() {
                 </div>
                 <div className="space-y-3 md:col-span-2 border-t border-brand-grey/10 pt-4">
                   <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4 text-brand-red" /> Checklist de Entrada
+                    <ClipboardList className="w-4 h-4 text-brand-red" /> Lista de verificação de entrada
                   </h4>
                   <div className="space-y-2">
                     {eChecklistItems.map((item, index) => (
@@ -1360,9 +1360,9 @@ export default function AdminWorkshopPage() {
                           className="w-full text-[10px] font-mono bg-brand-black border border-brand-grey/25 text-white rounded px-2 py-2 focus:outline-none focus:border-brand-red"
                         >
                           <option value="OK">OK</option>
-                          <option value="ATTENTION">ATENCAO</option>
+                          <option value="ATTENTION">ATENÇÃO</option>
                           <option value="DAMAGED">AVARIADO</option>
-                          <option value="NOT_APPLICABLE">NAO APLICA</option>
+                          <option value="NOT_APPLICABLE">NÃO SE APLICA</option>
                         </select>
                         <Input
                           placeholder="Observacao"
@@ -1409,7 +1409,7 @@ export default function AdminWorkshopPage() {
                   />
                   {newPhotoFiles.length > 0 && (
                     <div className="text-[10px] font-mono text-brand-grey">
-                      {newPhotoFiles.length} nova(s) foto(s) serao adicionada(s) ao salvar.
+                      {newPhotoFiles.length} nova(s) foto(s) serão adicionada(s) ao salvar.
                     </div>
                   )}
                 </div>

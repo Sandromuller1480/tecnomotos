@@ -250,7 +250,7 @@ export default function AdminOrdersPage() {
                 <TableHead>Cliente</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Total</TableHead>
-                <TableHead>Status Pagamento</TableHead>
+                <TableHead>Situação do pagamento</TableHead>
                 <TableHead>Canal</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -287,7 +287,7 @@ export default function AdminOrdersPage() {
                     {o.sales_channel === 'COUNTER' ? (
                       <Badge variant="info" className="text-[9px]">BALCÃO</Badge>
                     ) : (
-                      <Badge variant="neutral" className="text-[9px]">ONLINE</Badge>
+                      <Badge variant="neutral" className="text-[9px]">VIRTUAL</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -350,7 +350,7 @@ export default function AdminOrdersPage() {
                   <span className="text-[9px] uppercase block mb-1">Canal:</span>
                   <span className="flex items-center gap-1.5 text-white">
                     {selectedOrder.sales_channel === 'COUNTER' && <Store className="h-3.5 w-3.5 text-brand-red" />}
-                    {selectedOrder.sales_channel === 'COUNTER' ? 'Venda de balcão' : 'Loja online'}
+                    {selectedOrder.sales_channel === 'COUNTER' ? 'Venda de balcão' : 'Loja virtual'}
                   </span>
                 </div>
                 <div>
@@ -398,7 +398,7 @@ export default function AdminOrdersPage() {
                 </div>
                 {selectedOrder.stripe_checkout_session_id && (
                   <div className="flex items-center justify-between gap-4 pt-2">
-                    <span>Checkout Session ID:</span>
+                    <span>ID da sessão de pagamento:</span>
                     <span className="text-white select-all text-right max-w-xs truncate">{selectedOrder.stripe_checkout_session_id}</span>
                   </div>
                 )}

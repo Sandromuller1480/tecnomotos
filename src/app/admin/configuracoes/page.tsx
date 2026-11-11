@@ -162,7 +162,7 @@ export default function AdminSettingsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-brand-grey uppercase text-[10px] w-28">Status:</span>
+                  <span className="text-brand-grey uppercase text-[10px] w-28">Situação:</span>
                   <span className="text-emerald-400 font-bold flex items-center gap-1">
                     Stripe conectado <CheckCircle className="w-3.5 h-3.5" />
                   </span>

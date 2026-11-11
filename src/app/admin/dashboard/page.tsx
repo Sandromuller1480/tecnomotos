@@ -137,7 +137,7 @@ export default async function AdminDashboardPage() {
               Painel de Telemetria Geral
             </h1>
             <p className="text-xs text-brand-grey uppercase tracking-widest font-mono mt-1">
-              Indicadores reais de performance comercial e operacional
+              Indicadores reais de desempenho comercial e operacional
             </p>
           </div>
         </div>
@@ -168,7 +168,7 @@ export default async function AdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="space-y-4">
           <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-white border-b border-brand-grey/15 pb-2">
-            Status da Oficina Mecânica
+            Situação da oficina mecânica
           </h3>
           {recentServices.length === 0 ? (
             <p className="text-xs text-brand-grey font-mono py-6 text-center">Nenhuma ordem de serviço registrada.</p>

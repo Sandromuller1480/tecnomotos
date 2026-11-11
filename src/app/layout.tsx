@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   applicationName: 'TECNOMOTOS',
-  title: 'TECNOMOTOS | Performance, Peças e Serviços para Motocicletas',
-  description: 'A melhor oficina e loja online de peças de alta performance para motos. MotoGP style, engenharia mecânica premium.',
+  title: 'TECNOMOTOS | Desempenho, Peças e Serviços para Motocicletas',
+  description: 'A melhor oficina e loja virtual de peças de alto desempenho para motos. Estilo MotoGP e engenharia mecânica de alto padrão.',
   appleWebApp: {
     capable: true,
     title: 'TECNOMOTOS',
