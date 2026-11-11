@@ -181,7 +181,45 @@ export class FocusNFeProvider implements FiscalProvider {
     if (!payload || typeof payload !== 'object') return null;
     const source = payload as Record<string, unknown>;
     const message = source.mensagem || source.message || source.erro || source.status_sefaz;
-    return typeof message === 'string' ? message : null;
+    const summary = typeof message === 'string' ? message.trim() : '';
+    const details = this.extractErrorDetails(
+      source.erros || source.errors || source.detalhes || source.details
+    );
+
+    if (summary && details.length > 0) return `${summary}: ${details.join('; ')}`;
+    if (summary) return summary;
+    return details.length > 0 ? details.join('; ') : null;
+  }
+
+  private extractErrorDetails(value: unknown): string[] {
+    const details: string[] = [];
+
+    const visit = (entry: unknown) => {
+      if (details.length >= 5 || entry == null) return;
+      if (typeof entry === 'string') {
+        const detail = entry.trim();
+        if (detail && !details.includes(detail)) details.push(detail);
+        return;
+      }
+      if (Array.isArray(entry)) {
+        entry.forEach(visit);
+        return;
+      }
+      if (typeof entry !== 'object') return;
+
+      const record = entry as Record<string, unknown>;
+      const field = record.campo || record.field;
+      const message = record.mensagem || record.message || record.erro || record.error || record.descricao || record.description;
+      if (typeof message === 'string') {
+        const prefix = typeof field === 'string' && field.trim() ? `${field.trim()}: ` : '';
+        visit(`${prefix}${message}`);
+        return;
+      }
+      Object.values(record).forEach(visit);
+    };
+
+    visit(value);
+    return details;
   }
 
   private buildNfePayload(input: FiscalProductIssueInput) {
@@ -193,6 +231,8 @@ export class FocusNFeProvider implements FiscalProvider {
     return {
       cnpj_emitente: digitsOnly(input.company.cnpj),
       data_emissao: new Date().toISOString(),
+      tipo_documento: '1',
+      finalidade_emissao: '1',
       indicador_inscricao_estadual_destinatario: input.sale.taxpayerIndicator === 'contributor' ? '1' : input.sale.taxpayerIndicator === 'exempt' ? '2' : '9',
       inscricao_estadual_destinatario: input.sale.taxpayerIndicator === 'contributor' ? input.sale.customerStateRegistration || undefined : undefined,
       modalidade_frete: input.sale.freightMode === 'issuer' ? '0' : input.sale.freightMode === 'recipient' ? '1' : input.sale.freightMode === 'third_party' ? '2' : '9',

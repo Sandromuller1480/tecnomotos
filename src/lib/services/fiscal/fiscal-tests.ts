@@ -163,14 +163,38 @@ async function runAllTests() {
       company,
       sale
     });
-    const focusPayload = JSON.parse(focusPayloadBody) as { items?: Array<Record<string, unknown>> };
+    const focusPayload = JSON.parse(focusPayloadBody) as {
+      tipo_documento?: string;
+      finalidade_emissao?: string;
+      items?: Array<Record<string, unknown>>;
+    };
     const focusItem = (focusPayload.items || [])[0];
     assert(focusResult.status === 'authorized', 'Resposta autorizada da Focus deve ser mapeada');
+    assert(focusPayload.tipo_documento === '1', 'NF-e de venda deve ser enviada como nota de saida');
+    assert(focusPayload.finalidade_emissao === '1', 'NF-e de venda deve ser enviada com finalidade normal');
     assert(focusItem.icms_origem === '0', 'Origem deve usar o campo icms_origem aceito pela Focus');
     assert(focusItem.icms_situacao_tributaria === '102', 'CSOSN deve usar icms_situacao_tributaria');
     assert(focusItem.pis_situacao_tributaria === '08', 'CST PIS da regra deve chegar ao item');
     assert(focusItem.cofins_situacao_tributaria === '08', 'CST COFINS da regra deve chegar ao item');
     assert(focusItem.ipi_situacao_tributaria === '53', 'NF-e modelo 55 deve manter o CST IPI da regra');
+
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      mensagem: 'Erro na validacao do Schema XML',
+      erros: [{ campo: 'tipo_documento', mensagem: 'campo obrigatorio' }]
+    }), { status: 422, headers: { 'content-type': 'application/json' } });
+    let detailedFocusError = '';
+    try {
+      await new FocusNFeProvider('homologation').issueNfe({
+        operationId: '12345678-1234-1234-1234-123456789012',
+        reference: 'tecnomotos-focus-error-test',
+        environment: 'homologation',
+        company,
+        sale
+      });
+    } catch (error) {
+      detailedFocusError = error instanceof Error ? error.message : '';
+    }
+    assert(detailedFocusError.includes('tipo_documento: campo obrigatorio'), 'Detalhe de validacao da Focus deve chegar ao frontend');
     globalThis.fetch = originalFetch;
 
     console.log('\n6. Validando factory e bloqueio de producao...');
