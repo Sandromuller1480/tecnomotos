@@ -4,23 +4,48 @@ import { mapFiscalPaymentMethod } from './FiscalPaymentMapper';
 const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
 const taxCode = (parameters: Record<string, unknown> | undefined, key: string) => String(parameters?.[key] || '').trim();
 
-export function validateNfceSale(company: FiscalCompanySettings, sale: FiscalSale) {
+export function validateNfeSale(company: FiscalCompanySettings, sale: FiscalSale) {
   const errors: string[] = [];
 
   if (digitsOnly(company.cnpj).length !== 14) {
-    errors.push('Nao foi possivel emitir a NFC-e porque o CNPJ da empresa nao esta configurado corretamente.');
+    errors.push('Nao foi possivel emitir a NF-e porque o CNPJ da empresa nao esta configurado corretamente.');
   }
 
   if ((company.uf || '').toUpperCase() !== 'MT') {
-    errors.push('Nao foi possivel emitir a NFC-e porque a UF fiscal deve ser MT para a TECNOMOTOS.');
+    errors.push('Nao foi possivel emitir a NF-e porque a UF fiscal deve ser MT para a TECNOMOTOS.');
   }
 
   if (!company.crt) {
-    errors.push('Nao foi possivel emitir a NFC-e porque o CRT da empresa nao esta configurado.');
+    errors.push('Nao foi possivel emitir a NF-e porque o CRT da empresa nao esta configurado.');
+  }
+
+  if (!digitsOnly(company.stateRegistration)) {
+    errors.push('Nao foi possivel emitir a NF-e porque a Inscricao Estadual da empresa nao esta configurada.');
+  }
+
+  if (!/^\d{1,3}$/.test(company.nfeSeries || '')) {
+    errors.push('Nao foi possivel emitir a NF-e porque a serie do modelo 55 e invalida.');
+  }
+
+  if (sale.documentModel !== '55') {
+    errors.push('A emissao de produtos da TECNOMOTOS deve usar NF-e modelo 55.');
   }
 
   if (!sale.items.length) {
-    errors.push('Nao foi possivel emitir a NFC-e porque a venda nao possui itens.');
+    errors.push('Nao foi possivel emitir a NF-e porque a venda nao possui itens.');
+  }
+
+  const recipientDocument = digitsOnly(sale.customerDocument);
+  const address = sale.destinationAddress;
+  if (![11, 14].includes(recipientDocument.length)) errors.push('Informe CPF ou CNPJ valido do destinatario para emitir NF-e.');
+  if (!sale.customerName?.trim()) errors.push('Informe o nome ou razao social do destinatario para emitir NF-e.');
+  if (!address?.street?.trim() || !address.number?.trim() || !address.neighborhood?.trim()
+      || !address.city?.trim() || !/^[A-Z]{2}$/.test((address.state || '').toUpperCase())
+      || digitsOnly(address.postalCode).length !== 8) {
+    errors.push('Informe o endereco completo do destinatario para emitir NF-e.');
+  }
+  if (sale.taxpayerIndicator === 'contributor' && !sale.customerStateRegistration?.trim()) {
+    errors.push('Informe a Inscricao Estadual do destinatario contribuinte.');
   }
 
   try {
@@ -31,15 +56,15 @@ export function validateNfceSale(company: FiscalCompanySettings, sale: FiscalSal
 
   sale.items.forEach((item) => {
     const label = item.name || item.sku || item.id;
-    if (!item.name) errors.push(`Nao foi possivel emitir a NFC-e porque um item da venda esta sem descricao.`);
-    if (!item.quantity || item.quantity <= 0) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} esta com quantidade invalida.`);
-    if (item.unitPrice < 0) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} esta com valor invalido.`);
-    if (!item.ncm) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui NCM cadastrado.`);
+    if (!item.name) errors.push(`Nao foi possivel emitir a NF-e porque um item da venda esta sem descricao.`);
+    if (!item.quantity || item.quantity <= 0) errors.push(`Nao foi possivel emitir a NF-e porque o produto ${label} esta com quantidade invalida.`);
+    if (item.unitPrice < 0) errors.push(`Nao foi possivel emitir a NF-e porque o produto ${label} esta com valor invalido.`);
+    if (!item.ncm) errors.push(`Nao foi possivel emitir a NF-e porque o produto ${label} nao possui NCM cadastrado.`);
     if (!item.cfop) errors.push(`Nao foi possivel preparar a nota porque nenhuma regra aprovada resolveu o CFOP do produto ${label}.`);
     if (!item.cst && !item.csosn) errors.push(`Nao foi possivel preparar a nota porque nenhuma regra aprovada resolveu o CST/CSOSN do produto ${label}.`);
     if (!item.fiscalRuleId || !item.fiscalRuleVersion) errors.push(`Nao foi possivel preparar a nota porque o produto ${label} nao possui snapshot de regra fiscal.`);
-    if (item.origin === null || item.origin === undefined) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui origem fiscal cadastrada.`);
-    if (!item.unit) errors.push(`Nao foi possivel emitir a NFC-e porque o produto ${label} nao possui unidade fiscal cadastrada.`);
+    if (item.origin === null || item.origin === undefined) errors.push(`Nao foi possivel emitir a NF-e porque o produto ${label} nao possui origem fiscal cadastrada.`);
+    if (!item.unit) errors.push(`Nao foi possivel emitir a NF-e porque o produto ${label} nao possui unidade fiscal cadastrada.`);
     if (!/^\d{2}$/.test(taxCode(item.taxParameters, 'pis_situacao_tributaria'))) {
       errors.push(`Nao foi possivel preparar a nota porque a regra do produto ${label} nao informa a situacao tributaria do PIS.`);
     }

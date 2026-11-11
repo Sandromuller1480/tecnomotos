@@ -17,12 +17,11 @@ FISCAL_PROVIDER=mock
 FISCAL_ENVIRONMENT=mock
 FISCAL_PRODUCTION_ENABLED=false
 FISCAL_UF=MT
-FISCAL_MODEL=65
+FISCAL_MODEL=55
 FISCAL_CNPJ=22010781000138
 FISCAL_IE=
 FISCAL_CRT=
-FISCAL_NFCE_SERIES=1
-FISCAL_NFCE_START_NUMBER=1
+FISCAL_NFE_SERIES=1
 FOCUS_NFE_HOMOLOGATION_TOKEN=
 FOCUS_NFE_PRODUCTION_TOKEN=
 FOCUS_NFE_WEBHOOK_SECRET=
@@ -36,9 +35,9 @@ Documentacao oficial consultada:
 
 - Autenticacao: HTTP Basic Auth, token como usuario e senha vazia.
 - Ambiente: homologacao usa `https://homologacao.focusnfe.com.br`; producao usa `https://api.focusnfe.com.br`.
-- Emissao NFC-e: `POST /v2/nfce?ref={referencia}`.
-- Consulta NFC-e: `GET /v2/nfce/{referencia}`.
-- Cancelamento NFC-e: `DELETE /v2/nfce/{referencia}` com `justificativa` entre 15 e 255 caracteres.
+- Emissao NF-e: `POST /v2/nfe?ref={referencia}`.
+- Consulta NF-e: `GET /v2/nfe/{referencia}`.
+- Cancelamento NF-e: `DELETE /v2/nfe/{referencia}` com `justificativa` entre 15 e 255 caracteres.
 
 ## Banco
 
@@ -60,16 +59,16 @@ Fluxo:
 1. O frontend solicita emissao para `/api/fiscal/emit`.
 2. O backend autentica e verifica `fiscal.create`.
 3. O backend carrega o pedido pago e seus produtos reais.
-4. `validateNfceSale` valida empresa, venda, pagamento e dados fiscais dos produtos.
+4. `validateNfeSale` valida empresa, destinatario, pagamento e dados fiscais dos produtos.
 5. `FiscalOperationService` cria ou reaproveita a `fiscal_operation`.
-6. O provider emite a NFC-e.
+6. O provider emite a NF-e.
 7. O resultado e salvo em `fiscal_documents` e `fiscal_events`.
 
-Se uma venda ja possuir documento autorizado, processando ou cancelado, a rota retorna o documento existente e nao emite outra NFC-e.
+Se uma venda ja possuir documento autorizado, processando ou cancelado, a rota retorna o documento existente e nao emite outra NF-e.
 
 ## Consulta E Cancelamento
 
-Use `/api/fiscal/status` com `documentId` para consultar a NFC-e pela referencia persistida.
+Use `/api/fiscal/status` com `documentId` para consultar a NF-e pela referencia persistida.
 
 Use `/api/fiscal/cancel` com `documentId` e `reason`. O backend valida permissao, status autorizado e tamanho da justificativa antes de chamar o provider.
 
@@ -79,7 +78,7 @@ Endpoint criado: `/api/webhooks/focusnfe`.
 
 O webhook exige o cabecalho `x-focusnfe-webhook-secret`, calcula hash do payload para idempotencia em `fiscal_webhook_events`, localiza o documento pela referencia e atualiza o status. Ele responde rapidamente e nao armazena segredos.
 
-No Painel API da Focus, crie o evento `nfce` apontando para:
+No Painel API da Focus, crie o evento `nfe` apontando para:
 
 ```text
 https://SEU-DOMINIO/api/webhooks/focusnfe
@@ -98,7 +97,7 @@ FISCAL_PRODUCTION_ENABLED=false
 FOCUS_NFE_HOMOLOGATION_TOKEN=token_de_homologacao
 ```
 
-Depois teste em `/admin/fiscal/configuracoes` e emita NFC-e de pedido pago com produtos fiscalmente completos.
+Depois teste em `/admin/fiscal/configuracoes` e emita NF-e de pedido pago com produtos fiscalmente completos.
 
 ## Producao
 
@@ -111,4 +110,4 @@ FISCAL_PRODUCTION_ENABLED=true
 FOCUS_NFE_PRODUCTION_TOKEN=token_de_producao
 ```
 
-Nao ative producao antes de homologar, validar CSC/certificado e conferir tributacao dos produtos com contador.
+Nao ative producao antes de homologar, validar credenciamento, certificado e série fiscal e conferir tributacao dos produtos com contador.

@@ -2,7 +2,7 @@ import { createFiscalProvider, getFiscalRuntimeConfig } from './FiscalProviderFa
 import { mapFiscalPaymentMethod } from './FiscalPaymentMapper';
 import { MockFiscalProvider } from './providers/MockFiscalProvider';
 import { FocusNFeProvider } from './providers/FocusNFeProvider';
-import { validateNfceSale } from './validateNfceSale';
+import { validateNfeSale } from './validateNfeSale';
 import { FiscalCompanySettings, FiscalSale } from './types';
 import { FiscalResolutionError, FiscalRuleRecord, resolveFiscalItem } from '../../fiscal/rules/engine';
 import { isValidGtin } from '../../products/schema';
@@ -34,16 +34,28 @@ async function runAllTests() {
     const company: FiscalCompanySettings = {
       companyName: 'TECNOMOTOS',
       cnpj: '22010781000138',
+      stateRegistration: '0012345678',
       uf: 'MT',
       city: 'Tangara da Serra',
       ibgeCityCode: '5107958',
       crt: '1',
-      nfceSeries: '1'
+      nfeSeries: '1'
     };
 
     const sale: FiscalSale = {
       id: 'order-test',
+      documentModel: '55',
+      customerName: 'Cliente de Teste',
+      customerDocument: '12345678909',
       customerEmail: 'cliente@exemplo.com',
+      destinationUf: 'MT',
+      taxpayerIndicator: 'non_contributor',
+      purchasePurpose: 'final_consumption',
+      freightMode: 'none',
+      destinationAddress: {
+        street: 'Rua de Teste', number: '100', neighborhood: 'Centro',
+        city: 'Tangara da Serra', state: 'MT', postalCode: '78300000'
+      },
       totalAmount: 100,
       paymentMethod: 'pix',
       items: [{
@@ -73,27 +85,27 @@ async function runAllTests() {
     assert(mapFiscalPaymentMethod('credit_card') === '03', 'Credito deve ser mapeado para codigo fiscal 03');
     assert(mapFiscalPaymentMethod('debit_card') === '04', 'Debito deve ser mapeado para codigo fiscal 04');
 
-    console.log('\n2. Validando venda NFC-e...');
-    assert(validateNfceSale(company, sale).length === 0, 'Venda fiscal completa deve passar na validacao');
+    console.log('\n2. Validando venda NF-e...');
+    assert(validateNfeSale(company, sale).length === 0, 'Venda fiscal completa deve passar na validacao');
     assert(
-      validateNfceSale(company, { ...sale, items: [{ ...sale.items[0], ncm: '' }] }).some((message) => message.includes('NCM')),
+      validateNfeSale(company, { ...sale, items: [{ ...sale.items[0], ncm: '' }] }).some((message) => message.includes('NCM')),
       'Produto sem NCM deve bloquear emissao'
     );
     assert(
-      validateNfceSale(company, { ...sale, items: [{ ...sale.items[0], taxParameters: {} }] }).some((message) => message.includes('PIS')),
+      validateNfeSale(company, { ...sale, items: [{ ...sale.items[0], taxParameters: {} }] }).some((message) => message.includes('PIS')),
       'Regra sem CST do PIS deve bloquear emissao antes de chegar a Focus'
     );
 
     console.log('\n3. Validando motor de regras por item...');
     const approvedRule: FiscalRuleRecord = {
       id: 'rule-internal-no-st', name: 'Interna sem ST aprovada para teste', version: 1, status: 'approved',
-      companyCrt: '1', fiscalProfileId: 'profile-no-st', operationType: 'sale', documentModel: '65',
+      companyCrt: '1', fiscalProfileId: 'profile-no-st', operationType: 'sale', documentModel: '55',
       originScope: 'internal', destinationScope: 'internal', taxpayerIndicator: 'non_contributor',
       purchasePurpose: 'final_consumption', cfop: '5102', csosn: '102', validFrom: '2026-01-01',
       approvedBy: 'fixture-accountant', approvedAt: '2026-01-01T00:00:00.000Z', source: 'fixture de teste controlada'
     };
     const product = { id: 'p1', sku: 'TESTE-1', name: 'Produto teste', fiscalStatus: 'complete' as const, fiscalProfileId: 'profile-no-st', ncm: '87141000', origin: 0, unit: 'UN', withoutGtin: true };
-    const context = { companyCrt: '1', issuerUf: 'MT', destinationUf: 'MT', destinationScope: 'internal' as const, taxpayerIndicator: 'non_contributor' as const, purchasePurpose: 'final_consumption' as const, operationType: 'sale' as const, documentModel: '65' as const, occurredAt: new Date('2026-11-04T12:00:00Z') };
+    const context = { companyCrt: '1', issuerUf: 'MT', destinationUf: 'MT', destinationScope: 'internal' as const, taxpayerIndicator: 'non_contributor' as const, purchasePurpose: 'final_consumption' as const, operationType: 'sale' as const, documentModel: '55' as const, occurredAt: new Date('2026-11-04T12:00:00Z') };
     assert(resolveFiscalItem(context, product, [approvedRule]).cfop === '5102', 'Regra interna aprovada deve resolver 5102/102');
 
     let pendingBlocked = false;
@@ -124,15 +136,15 @@ async function runAllTests() {
 
     console.log('\n4. Validando provider mock...');
     const mockProvider = new MockFiscalProvider();
-    const result = await mockProvider.issueNfce({
+    const result = await mockProvider.issueNfe({
       operationId: '12345678-1234-1234-1234-123456789012',
-      reference: 'tecnomotos-nfce-order-test',
+      reference: 'tecnomotos-nfe-order-test',
       environment: 'mock',
       company,
       sale
     });
     assert(result.status === 'authorized', 'MockFiscalProvider deve autorizar sem chamada externa');
-    assert(String(result.accessKey).startsWith('MOCK-NFCE-'), 'Mock nao deve gerar chave fiscal real');
+    assert(String(result.accessKey).startsWith('MOCK-NFE-'), 'Mock nao deve gerar chave fiscal real');
 
     console.log('\n5. Validando payload tributario da Focus...');
     process.env.FOCUS_NFE_HOMOLOGATION_TOKEN = 'token-de-teste';
@@ -144,7 +156,7 @@ async function runAllTests() {
         headers: { 'content-type': 'application/json' }
       });
     };
-    const focusResult = await new FocusNFeProvider('homologation').issueNfce({
+    const focusResult = await new FocusNFeProvider('homologation').issueNfe({
       operationId: '12345678-1234-1234-1234-123456789012',
       reference: 'tecnomotos-focus-payload-test',
       environment: 'homologation',
@@ -158,18 +170,7 @@ async function runAllTests() {
     assert(focusItem.icms_situacao_tributaria === '102', 'CSOSN deve usar icms_situacao_tributaria');
     assert(focusItem.pis_situacao_tributaria === '08', 'CST PIS da regra deve chegar ao item');
     assert(focusItem.cofins_situacao_tributaria === '08', 'CST COFINS da regra deve chegar ao item');
-    assert(focusItem.ipi_situacao_tributaria === undefined, 'NFC-e modelo 65 nao deve enviar o grupo do IPI');
-
-    await new FocusNFeProvider('homologation').issueNfe({
-      operationId: '12345678-1234-1234-1234-123456789012',
-      reference: 'tecnomotos-nfe-payload-test',
-      environment: 'homologation',
-      company,
-      sale: { ...sale, documentModel: '55' }
-    });
-    const nfePayload = JSON.parse(focusPayloadBody) as { items?: Array<Record<string, unknown>> };
-    const nfeItem = (nfePayload.items || [])[0];
-    assert(nfeItem.ipi_situacao_tributaria === '53', 'NF-e modelo 55 deve manter o CST IPI da regra');
+    assert(focusItem.ipi_situacao_tributaria === '53', 'NF-e modelo 55 deve manter o CST IPI da regra');
     globalThis.fetch = originalFetch;
 
     console.log('\n6. Validando factory e bloqueio de producao...');

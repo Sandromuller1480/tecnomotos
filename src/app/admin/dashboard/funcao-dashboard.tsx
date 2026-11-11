@@ -36,7 +36,7 @@ const configs = {
     links: [
       { href: '/admin/financeiro', label: 'Fluxo de Caixa' },
       { href: '/admin/pedidos', label: 'Pedidos' },
-      { href: '/admin/fiscal', label: 'NFC-e' }
+      { href: '/admin/fiscal', label: 'NF-e' }
     ]
   },
   FINANCIAL: {

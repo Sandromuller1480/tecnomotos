@@ -44,6 +44,10 @@ export async function POST(request: Request) {
 
     const adminClient = createAdminClient();
 
+    if (!fiscalContext) {
+      return NextResponse.json({ error: 'Confirme os dados do destinatario antes de emitir a NF-e.' }, { status: 400 });
+    }
+
     if (fiscalContext) {
       const deliveryMode = fiscalContext.deliveryMode === 'delivery' ? 'delivery' : fiscalContext.deliveryMode === 'pickup' ? 'pickup' : null;
       const taxpayerIndicator = ['contributor', 'exempt', 'non_contributor'].includes(fiscalContext.taxpayerIndicator)
@@ -72,6 +76,18 @@ export async function POST(request: Request) {
 
       const clean = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null;
       const digits = (value: unknown) => typeof value === 'string' ? value.replace(/\D/g, '') : '';
+      const recipientDocument = digits(fiscalContext.recipientDocument);
+      const postalCode = digits(fiscalContext.postalCode);
+      if (!clean(fiscalContext.recipientName) || ![11, 14].includes(recipientDocument.length)) {
+        return NextResponse.json({ error: 'Para NF-e, informe nome e CPF/CNPJ valido do destinatario.' }, { status: 400 });
+      }
+      if (!clean(fiscalContext.street) || !clean(fiscalContext.number) || !clean(fiscalContext.neighborhood)
+          || !clean(fiscalContext.city) || postalCode.length !== 8) {
+        return NextResponse.json({ error: 'Para NF-e, informe o endereco completo do destinatario.' }, { status: 400 });
+      }
+      if (taxpayerIndicator === 'contributor' && !clean(fiscalContext.stateRegistration)) {
+        return NextResponse.json({ error: 'Informe a Inscricao Estadual do destinatario contribuinte.' }, { status: 400 });
+      }
       const { error: contextError } = await adminClient
         .from('orders')
         .update({
@@ -80,7 +96,7 @@ export async function POST(request: Request) {
           purchase_purpose: purchasePurpose,
           fiscal_taxpayer_indicator: taxpayerIndicator,
           fiscal_state_registration: clean(fiscalContext.stateRegistration),
-          fiscal_recipient_document: digits(fiscalContext.recipientDocument) || null,
+          fiscal_recipient_document: recipientDocument,
           fiscal_freight_mode: freightMode,
           fiscal_destination_street: clean(fiscalContext.street),
           fiscal_destination_number: clean(fiscalContext.number),
@@ -88,7 +104,7 @@ export async function POST(request: Request) {
           fiscal_destination_neighborhood: clean(fiscalContext.neighborhood),
           fiscal_destination_city: clean(fiscalContext.city),
           fiscal_destination_uf: destinationUf,
-          fiscal_destination_postal_code: digits(fiscalContext.postalCode) || null
+          fiscal_destination_postal_code: postalCode
         })
         .eq('id', orderId);
 
@@ -98,7 +114,7 @@ export async function POST(request: Request) {
     const fiscalService = new FiscalOperationService(adminClient);
     // Product tax codes and recipient context are loaded from the database.
     // Values sent by the browser are intentionally not fiscal authority.
-    const result = await fiscalService.issueNfce(orderId);
+    const result = await fiscalService.issueNfe(orderId);
 
     return NextResponse.json({
       success: true,

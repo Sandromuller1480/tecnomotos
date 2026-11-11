@@ -36,7 +36,7 @@ INSERT INTO public.permissions (key, description) VALUES
 
 ('reports.view', 'Visualizar relatórios administrativos e estatísticas.'),
 
-('fiscal.view', 'Visualizar notas fiscais emitidas (NFC-e).'),
+('fiscal.view', 'Visualizar notas fiscais emitidas (NF-e).'),
 ('fiscal.create', 'Emitir ou cancelar notas fiscais.'),
 
 ('employees.view', 'Visualizar lista e detalhes de funcionários.'),
@@ -95,5 +95,5 @@ END $$;
 INSERT INTO public.settings (key, value, description) VALUES
 ('company_name', '"TECNOMOTOS"', 'Nome oficial da empresa.'),
 ('stripe_mode', '"test"', 'Modo de operação do Stripe (test ou production).'),
-('fiscal_environment', '"mock"', 'Ambiente de emissão fiscal de NFC-e (mock ou production).')
+('fiscal_environment', '"mock"', 'Ambiente de emissão fiscal de NF-e (mock ou production).')
 ON CONFLICT (key) DO NOTHING;

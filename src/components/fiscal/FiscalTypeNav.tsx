@@ -9,7 +9,7 @@ const options = [
   {
     href: '/admin/fiscal',
     label: 'Venda de produtos',
-    description: 'NFC-e para pedidos pagos',
+    description: 'NF-e para pedidos pagos',
     icon: Package,
     exact: true
   },

@@ -1,5 +1,5 @@
 import { mapFiscalPaymentMethod } from '../FiscalPaymentMapper';
-import { FiscalEnvironment, FiscalProvider, NfceIssueInput, NfseIssueInput, ProviderFiscalResult } from '../types';
+import { FiscalEnvironment, FiscalProductIssueInput, FiscalProvider, NfseIssueInput, ProviderFiscalResult } from '../types';
 
 const FOCUS_BASE_URLS: Record<Exclude<FiscalEnvironment, 'mock'>, string> = {
   homologation: 'https://homologacao.focusnfe.com.br',
@@ -63,16 +63,6 @@ export class FocusNFeProvider implements FiscalProvider {
 
   constructor(private readonly environment: Exclude<FiscalEnvironment, 'mock'>) {}
 
-  async issueNfce(input: NfceIssueInput): Promise<ProviderFiscalResult> {
-    const payload = this.buildNfcePayload(input);
-    const response = await this.request(`/v2/nfce?ref=${encodeURIComponent(input.reference)}&completa=1`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
-    return this.mapFocusResponse(response);
-  }
-
   async getNfce(reference: string): Promise<ProviderFiscalResult> {
     const response = await this.request(`/v2/nfce/${encodeURIComponent(reference)}?completa=1`, {
       method: 'GET'
@@ -94,9 +84,9 @@ export class FocusNFeProvider implements FiscalProvider {
     return this.mapFocusResponse(response);
   }
 
-  async issueNfe(input: NfceIssueInput): Promise<ProviderFiscalResult> {
+  async issueNfe(input: FiscalProductIssueInput): Promise<ProviderFiscalResult> {
     const response = await this.request(`/v2/nfe?ref=${encodeURIComponent(input.reference)}&completa=1`, {
-      method: 'POST', body: JSON.stringify(this.buildNfcePayload(input))
+      method: 'POST', body: JSON.stringify(this.buildNfePayload(input))
     });
     return this.mapFocusResponse(response);
   }
@@ -126,9 +116,9 @@ export class FocusNFeProvider implements FiscalProvider {
 
   async getServiceStatus() {
     // The company-management endpoint is not exposed by the homologation host.
-    // A missing NFC-e reference still passes through Focus authentication:
+    // A missing NF-e reference still passes through Focus authentication:
     // valid token => 404, invalid token => 401.
-    await this.request('/v2/nfce/tecnomotos-connection-check', { method: 'GET' }, [404]);
+    await this.request('/v2/nfe/tecnomotos-connection-check', { method: 'GET' }, [404]);
 
     return {
       status: 'ONLINE' as const,
@@ -194,7 +184,7 @@ export class FocusNFeProvider implements FiscalProvider {
     return typeof message === 'string' ? message : null;
   }
 
-  private buildNfcePayload(input: NfceIssueInput) {
+  private buildNfePayload(input: FiscalProductIssueInput) {
     const paymentCode = mapFiscalPaymentMethod(input.sale.paymentMethod);
     const customerDocument = digitsOnly(input.sale.customerDocument);
     const isCnpj = customerDocument.length === 14;
@@ -209,11 +199,12 @@ export class FocusNFeProvider implements FiscalProvider {
       local_destino: input.sale.destinationUf === input.company.uf ? '1' : '2',
       consumidor_final: input.sale.purchasePurpose === 'final_consumption' ? '1' : '0',
       presenca_comprador: input.sale.buyerPresence || '9',
-      natureza_operacao: 'VENDA AO CONSUMIDOR',
+      natureza_operacao: 'VENDA DE MERCADORIA',
       nome_destinatario: input.sale.customerName || undefined,
+      email_destinatario: input.sale.customerEmail || undefined,
       cpf_destinatario: isCpf ? customerDocument : undefined,
       cnpj_destinatario: isCnpj ? customerDocument : undefined,
-      serie: input.sale.documentModel === '55' ? input.company.nfeSeries || undefined : input.company.nfceSeries || undefined,
+      serie: input.company.nfeSeries || undefined,
       uf_destinatario: input.sale.destinationUf || undefined,
       logradouro_destinatario: input.sale.destinationAddress?.street || undefined,
       numero_destinatario: input.sale.destinationAddress?.number || undefined,
@@ -221,7 +212,7 @@ export class FocusNFeProvider implements FiscalProvider {
       bairro_destinatario: input.sale.destinationAddress?.neighborhood || undefined,
       municipio_destinatario: input.sale.destinationAddress?.city || undefined,
       cep_destinatario: digitsOnly(input.sale.destinationAddress?.postalCode) || undefined,
-      pais_destinatario: input.sale.documentModel === '55' ? 'Brasil' : undefined,
+      pais_destinatario: 'Brasil',
       items: input.sale.items.map((item, index) => ({
         numero_item: String(index + 1),
         codigo_produto: item.sku || item.productId || item.id,
@@ -238,9 +229,7 @@ export class FocusNFeProvider implements FiscalProvider {
         valor_unitario_tributavel: item.unitPrice,
         codigo_barras_comercial: item.gtin || undefined,
         codigo_barras_tributavel: item.gtin || undefined,
-        // NFC-e (model 65) does not accept the IPI group. The same fiscal
-        // classification remains available when the operation uses NF-e 55.
-        ...focusItemTaxParameters(item.taxParameters, input.sale.documentModel === '55'),
+        ...focusItemTaxParameters(item.taxParameters),
         icms_origem: String(item.origin),
         icms_situacao_tributaria: item.csosn || item.cst
       })),

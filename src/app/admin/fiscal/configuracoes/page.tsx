@@ -322,29 +322,12 @@ export default function AdminFiscalSettingsPage() {
               <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-grey border-b border-brand-grey/10 pb-2">
                 Série & Numeração Fiscal
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono text-brand-grey uppercase">Série NF-e (Modelo 55)</label>
                   <Input
                     value={settings?.nfe_series || ''}
                     onChange={(e) => setSettings(s => s ? { ...s, nfe_series: e.target.value } : null)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-brand-grey uppercase">Série NFC-e (Modelo 65)</label>
-                  <Input
-                    value={settings?.nfce_series || ''}
-                    onChange={(e) => setSettings(s => s ? { ...s, nfce_series: e.target.value } : null)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-brand-grey uppercase">Próxima NFC-e (Número)</label>
-                  <Input
-                    type="number"
-                    value={settings?.nfce_next_number || 1}
-                    onChange={(e) => setSettings(s => s ? { ...s, nfce_next_number: parseInt(e.target.value) || 1 } : null)}
                     required
                   />
                 </div>

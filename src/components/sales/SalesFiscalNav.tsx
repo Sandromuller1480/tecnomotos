@@ -6,7 +6,7 @@ import { Package, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 const fiscalTypes = [
-  { href: '/admin/vendas/fiscal/produtos', label: 'Peças e produtos', description: 'NFC-e de mercadorias', icon: Package },
+  { href: '/admin/vendas/fiscal/produtos', label: 'Peças e produtos', description: 'NF-e de mercadorias', icon: Package },
   { href: '/admin/vendas/fiscal/servicos', label: 'Serviços', description: 'NFS-e da oficina', icon: Wrench }
 ];
 

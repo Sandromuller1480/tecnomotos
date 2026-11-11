@@ -1,9 +1,9 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
 import { createFiscalProvider, getFiscalRuntimeConfig } from './FiscalProviderFactory';
-import { validateNfceSale } from './validateNfceSale';
+import { validateNfeSale } from './validateNfeSale';
 import { FiscalCompanySettings, FiscalDocumentStatus, FiscalSale, FiscalServiceOrder, ProviderFiscalResult } from './types';
-import { determineDocumentModel, FiscalResolutionContext, FiscalRuleRecord, resolveFiscalItem } from '@/lib/fiscal/rules/engine';
+import { FiscalResolutionContext, FiscalRuleRecord, resolveFiscalItem } from '@/lib/fiscal/rules/engine';
 
 type DatabaseClient = SupabaseClient<any, 'public', any>;
 
@@ -25,7 +25,7 @@ function fiscalErrorMessage(error: unknown, fallback: string) {
 export class FiscalOperationService {
   constructor(private readonly db: DatabaseClient) {}
 
-  async issueNfce(orderId: string, fallback?: Partial<FiscalSale>) {
+  async issueNfe(orderId: string, fallback?: Partial<FiscalSale>) {
     const config = getFiscalRuntimeConfig();
     const existing = await this.getExistingDocument(orderId);
 
@@ -36,7 +36,7 @@ export class FiscalOperationService {
     let sale = await this.loadSale(orderId, fallback);
     const company = await this.loadCompanySettings();
     sale = await this.resolveSaleItems(sale, company);
-    const validationErrors = validateNfceSale(company, sale);
+    const validationErrors = validateNfeSale(company, sale);
 
     if (validationErrors.length > 0) {
       throw new Error(validationErrors[0]);
@@ -46,7 +46,7 @@ export class FiscalOperationService {
 
     const operation = await this.claimOperation(orderId, config.provider, config.environment, sale.documentModel!);
     await this.updateOperation(operation.id, 'processing');
-    await this.log('fiscal.issue.start', null, operation.reference, 'processing', 'Emissao NFC-e iniciada.');
+    await this.log('fiscal.issue.start', null, operation.reference, 'processing', 'Emissao NF-e iniciada.');
 
     const provider = createFiscalProvider();
 
@@ -58,7 +58,7 @@ export class FiscalOperationService {
         company,
         sale
       };
-      const result = sale.documentModel === '55' ? await provider.issueNfe(issueInput) : await provider.issueNfce(issueInput);
+      const result = await provider.issueNfe(issueInput);
 
       const document = await this.saveDocument(operation.id, orderId, operation.reference, result, company, sale);
       await this.db.from('fiscal_previews').update({ status: 'used' }).eq('sale_id', orderId).eq('status', 'ready');
@@ -74,11 +74,9 @@ export class FiscalOperationService {
 
       return { document, reused: false };
     } catch (error) {
-      const message = fiscalErrorMessage(error, 'Erro ao emitir NFC-e.');
+      const message = fiscalErrorMessage(error, 'Erro ao emitir NF-e.');
       try {
-        const reconciled = sale.documentModel === '55'
-          ? await provider.getNfe(operation.reference)
-          : await provider.getNfce(operation.reference);
+        const reconciled = await provider.getNfe(operation.reference);
         if (['processing', 'authorized', 'rejected', 'cancelled'].includes(reconciled.status)) {
           const document = await this.saveDocument(operation.id, orderId, operation.reference, reconciled, company, sale);
           await this.updateOperation(operation.id, reconciled.status, reconciled.errorMessage);
@@ -147,7 +145,8 @@ export class FiscalOperationService {
     const provider = createFiscalProvider();
     const isNfse = document.document_type === 'NFSE';
     const isNfe = document.document_type === 'NFE';
-    await this.log('fiscal.query.start', document.id, document.reference, document.status, `Consulta ${isNfse ? 'NFS-e' : 'NFC-e'} iniciada.`);
+    const documentLabel = isNfse ? 'NFS-e' : isNfe ? 'NF-e' : 'NFC-e';
+    await this.log('fiscal.query.start', document.id, document.reference, document.status, `Consulta ${documentLabel} iniciada.`);
     const result = isNfse ? await provider.getNfse(document.reference) : isNfe ? await provider.getNfe(document.reference) : await provider.getNfce(document.reference);
     const updated = await this.applyProviderResult(document.id, result);
 
@@ -155,7 +154,7 @@ export class FiscalOperationService {
       await this.updateOperation(document.fiscal_operation_id, result.status, result.errorMessage);
     }
 
-    await this.log('fiscal.query.success', document.id, document.reference, result.status, result.errorMessage || 'Consulta NFC-e atualizada.', result);
+    await this.log('fiscal.query.success', document.id, document.reference, result.status, result.errorMessage || `Consulta ${documentLabel} atualizada.`, result);
 
     return updated;
   }
@@ -182,7 +181,8 @@ export class FiscalOperationService {
     const provider = createFiscalProvider();
     const isNfse = document.document_type === 'NFSE';
     const isNfe = document.document_type === 'NFE';
-    await this.log('fiscal.cancel.start', document.id, document.reference, document.status, `Cancelamento ${isNfse ? 'NFS-e' : 'NFC-e'} iniciado.`);
+    const documentLabel = isNfse ? 'NFS-e' : isNfe ? 'NF-e' : 'NFC-e';
+    await this.log('fiscal.cancel.start', document.id, document.reference, document.status, `Cancelamento ${documentLabel} iniciado.`);
     const result = isNfse ? await provider.cancelNfse(document.reference, reason) : isNfe ? await provider.cancelNfe(document.reference, reason) : await provider.cancelNfce(document.reference, reason);
     const updated = await this.applyProviderResult(document.id, result);
 
@@ -190,7 +190,7 @@ export class FiscalOperationService {
       await this.updateOperation(document.fiscal_operation_id, result.status, result.errorMessage);
     }
 
-    await this.log('fiscal.cancel.success', document.id, document.reference, result.status, 'Cancelamento NFC-e processado.', { reasonLength: reason.length, ...result });
+    await this.log('fiscal.cancel.success', document.id, document.reference, result.status, `Cancelamento ${documentLabel} processado.`, { reasonLength: reason.length, ...result });
 
     return updated;
   }
@@ -320,7 +320,7 @@ export class FiscalOperationService {
       .single();
 
     if (error || !order) throw new Error('Venda nao encontrada para emissao fiscal.');
-    if (order.status !== 'paid') throw new Error('A NFC-e so pode ser emitida para pedido com pagamento aprovado.');
+    if (order.status !== 'paid') throw new Error('A NF-e so pode ser emitida para pedido com pagamento aprovado.');
 
     let customer: any = null;
     let address: any = null;
@@ -388,10 +388,7 @@ export class FiscalOperationService {
     if (!sale.taxpayerIndicator) throw new Error('Confirme a situação de contribuinte do ICMS do cliente.');
     if (!sale.purchasePurpose) throw new Error('Informe se a compra é para revenda ou consumo final.');
     const destinationScope = sale.destinationUf.toUpperCase() === company.uf.toUpperCase() ? 'internal' : 'interstate';
-    const documentModel = determineDocumentModel({
-      destinationScope,
-      nfceEligible: destinationScope === 'internal' && sale.taxpayerIndicator === 'non_contributor' && sale.purchasePurpose === 'final_consumption'
-    });
+    const documentModel = '55' as const;
     const { data, error } = await this.db.from('fiscal_rules').select('*').eq('status', 'approved');
     if (error) throw new Error(`Não foi possível carregar as regras fiscais: ${error.message}`);
     const rules: FiscalRuleRecord[] = (data || []).map((rule: any) => ({
@@ -559,7 +556,7 @@ export class FiscalOperationService {
       sale_id: orderId,
       provider: getFiscalRuntimeConfig().provider,
       document_type: sale.documentModel === '55' ? 'NFE' : 'NFCE',
-      model: sale.documentModel || '65',
+      model: sale.documentModel || '55',
       environment: getFiscalRuntimeConfig().environment,
       reference,
       status: result.status,

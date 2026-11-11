@@ -1,30 +1,7 @@
-import { FiscalProvider, NfceIssueInput, NfseIssueInput, ProviderFiscalResult } from '../types';
+import { FiscalProductIssueInput, FiscalProvider, NfseIssueInput, ProviderFiscalResult } from '../types';
 
 export class MockFiscalProvider implements FiscalProvider {
   readonly name = 'mock' as const;
-
-  async issueNfce(input: NfceIssueInput): Promise<ProviderFiscalResult> {
-    const sequence = input.operationId.slice(0, 8).toUpperCase();
-
-    return {
-      status: 'authorized',
-      providerStatus: 'mock_authorized',
-      providerDocumentId: `MOCK-NFCE-${sequence}`,
-      number: `MOCK-${sequence}`,
-      series: input.company.nfceSeries || '1',
-      accessKey: `MOCK-NFCE-${sequence}`,
-      protocol: `MOCK-PROTOCOL-${sequence}`,
-      xmlUrl: `/api/fiscal/mock/xml/${input.reference}`,
-      danfceUrl: `/api/fiscal/mock/danfce/${input.reference}`,
-      qrCodeUrl: `/api/fiscal/mock/qrcode/${input.reference}`,
-      authorizedAt: new Date().toISOString(),
-      raw: {
-        reference: input.reference,
-        provider: this.name,
-        itemCount: input.sale.items.length
-      }
-    };
-  }
 
   async getNfce(reference: string): Promise<ProviderFiscalResult> {
     return {
@@ -47,11 +24,15 @@ export class MockFiscalProvider implements FiscalProvider {
     };
   }
 
-  async issueNfe(input: NfceIssueInput): Promise<ProviderFiscalResult> {
+  async issueNfe(input: FiscalProductIssueInput): Promise<ProviderFiscalResult> {
     const sequence = input.operationId.slice(0, 8).toUpperCase();
     return {
-      status: 'processing', providerStatus: 'mock_processing', providerDocumentId: `MOCK-NFE-${sequence}`,
+      status: 'authorized', providerStatus: 'mock_authorized', providerDocumentId: `MOCK-NFE-${sequence}`,
       number: `MOCK-${sequence}`, series: input.company.nfeSeries || '1',
+      accessKey: `MOCK-NFE-${sequence}`, protocol: `MOCK-PROTOCOL-${sequence}`,
+      xmlUrl: `/api/fiscal/mock/xml/${input.reference}`,
+      danfceUrl: `/api/fiscal/mock/danfe/${input.reference}`,
+      authorizedAt: new Date().toISOString(),
       raw: { reference: input.reference, provider: this.name, itemCount: input.sale.items.length }
     };
   }

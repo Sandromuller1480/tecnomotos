@@ -63,7 +63,7 @@ export interface FiscalSale {
   items: FiscalSaleItem[];
 }
 
-export interface NfceIssueInput {
+export interface FiscalProductIssueInput {
   operationId: string;
   reference: string;
   environment: FiscalEnvironment;
@@ -107,10 +107,9 @@ export interface ProviderFiscalResult {
 
 export interface FiscalProvider {
   readonly name: FiscalProviderName;
-  issueNfce(input: NfceIssueInput): Promise<ProviderFiscalResult>;
   getNfce(reference: string): Promise<ProviderFiscalResult>;
   cancelNfce(reference: string, reason: string): Promise<ProviderFiscalResult>;
-  issueNfe(input: NfceIssueInput): Promise<ProviderFiscalResult>;
+  issueNfe(input: FiscalProductIssueInput): Promise<ProviderFiscalResult>;
   getNfe(reference: string): Promise<ProviderFiscalResult>;
   cancelNfe(reference: string, reason: string): Promise<ProviderFiscalResult>;
   issueNfse(input: NfseIssueInput): Promise<ProviderFiscalResult>;

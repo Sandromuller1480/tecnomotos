@@ -16,6 +16,7 @@ interface ReportDetailModalProps {
   kind: 'sale' | 'service';
   id: string;
   onClose: () => void;
+  onFiscalIssued?: () => void;
 }
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -80,7 +81,7 @@ function DetailTable({ headers, rows }: { headers: string[]; rows: Array<Array<s
   );
 }
 
-export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps) {
+export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportDetailModalProps) {
   const { success, error } = useToast();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -211,10 +212,7 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
         error('Dados fiscais incompletos', 'Informe destino, frete, situação perante o ICMS e finalidade da compra.');
         return;
       }
-      const destinationUf = fiscalForm.deliveryMode === 'pickup' ? fiscalForm.issuerUf : fiscalForm.destinationUf;
-      const requiresNfe = destinationUf !== fiscalForm.issuerUf
-        || fiscalForm.taxpayerIndicator !== 'non_contributor'
-        || fiscalForm.purchasePurpose !== 'final_consumption';
+      const requiresNfe = true;
       if (requiresNfe) {
         const document = fiscalForm.recipientDocument.replace(/\D/g, '');
         const postalCode = fiscalForm.postalCode.replace(/\D/g, '');
@@ -262,6 +260,7 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
         documentKind === 'products' ? 'Nota de produtos processada' : 'NFS-e processada',
         result.reused ? 'O documento fiscal já existente foi reutilizado.' : 'Documento fiscal emitido com sucesso.'
       );
+      onFiscalIssued?.();
     } catch (emitError) {
       error('Falha na emissão fiscal', emitError instanceof Error ? emitError.message : 'Não foi possível emitir a nota fiscal.');
     } finally {
@@ -348,14 +347,8 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
 
                 if (!hasProducts && !hasServices) return null;
 
-                const destinationUf = fiscalForm.deliveryMode === 'pickup' ? fiscalForm.issuerUf : fiscalForm.destinationUf;
-                const estimatedNfe = Boolean(destinationUf) && (
-                  destinationUf !== fiscalForm.issuerUf
-                  || fiscalForm.taxpayerIndicator === 'contributor'
-                  || fiscalForm.taxpayerIndicator === 'exempt'
-                  || fiscalForm.purchasePurpose === 'resale'
-                );
-                const showAddress = fiscalForm.deliveryMode === 'delivery' || estimatedNfe;
+                const estimatedNfe = true;
+                const showAddress = true;
                 const selectClass = 'w-full border border-brand-grey/20 bg-brand-darkgrey px-3 py-2.5 text-xs text-white focus:border-brand-red focus:outline-none';
 
                 return (
@@ -363,7 +356,7 @@ export function ReportDetailModal({ kind, id, onClose }: ReportDetailModalProps)
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <h4 className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-brand-red">Emissão fiscal</h4>
-                        {hasProducts && <p className="mt-1 text-[10px] text-brand-grey">Modelo estimado: {estimatedNfe ? 'NF-e (55)' : 'NFC-e (65)'}</p>}
+                        {hasProducts && <p className="mt-1 text-[10px] text-brand-grey">Modelo: NF-e (55)</p>}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {hasProducts && (

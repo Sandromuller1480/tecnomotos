@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FiscalTypeNav } from '@/components/fiscal/FiscalTypeNav';
+import { ReportDetailModal } from '@/components/reports/ReportDetailModal';
 import { FileText, Plus, CheckCircle, RefreshCw, AlertCircle, XCircle } from 'lucide-react';
 
 interface FiscalDocument {
@@ -106,12 +107,13 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
   const [orders, setOrders] = useState<PendingFiscalOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEmitting, setIsEmitting] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const fetchDocuments = async () => {
     const { data: docs, error: fetchErr } = await supabase
       .from('fiscal_documents')
       .select('*')
-      .eq('document_type', 'NFCE')
+      .in('document_type', ['NFE', 'NFCE'])
       .order('created_at', { ascending: false });
 
     if (fetchErr) throw fetchErr;
@@ -206,8 +208,12 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
   const pendingOrders = useMemo(() => orders.filter((order) => (order.order_items || []).length > 0), [orders]);
 
   const handleEmitInvoice = async (order: PendingFiscalOrder) => {
+    if (selectedOrderId !== order.id) {
+      setSelectedOrderId(order.id);
+      return;
+    }
     setIsEmitting(order.id);
-    info('Emitindo NFC-e', `Enviando pedido #${order.id.slice(0, 8).toUpperCase()} para emissão fiscal.`);
+    info('Emitindo NF-e', `Enviando pedido #${order.id.slice(0, 8).toUpperCase()} para emissão fiscal.`);
 
     try {
       const response = await fetch('/api/fiscal/emit', {
@@ -224,7 +230,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro desconhecido na emissão.');
 
-      success('NFC-e registrada', result.reused ? 'Documento fiscal ja existente foi reutilizado.' : 'Documento fiscal registrado com sucesso.');
+      success('NF-e registrada', result.reused ? 'Documento fiscal ja existente foi reutilizado.' : 'Documento fiscal registrado com sucesso.');
       await loadFiscalData();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Falha na emissão.';
@@ -236,14 +242,14 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
 
   const handleCheckStatus = async (doc: FiscalDocument) => {
     try {
-      info('Consultando NFC-e', `Atualizando status fiscal de ${doc.reference || doc.id}.`);
+      info('Consultando NF-e', `Atualizando status fiscal de ${doc.reference || doc.id}.`);
       const response = await fetch('/api/fiscal/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId: doc.id }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Erro ao consultar NFC-e.');
+      if (!response.ok) throw new Error(result.error || 'Erro ao consultar NF-e.');
       success('Situação atualizada', `Documento fiscal: ${fiscalStatusLabels[result.document.status] || result.document.status}.`);
       await loadFiscalData();
     } catch (e: unknown) {
@@ -253,19 +259,19 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
   };
 
   const handleCancel = async (doc: FiscalDocument) => {
-    const reason = window.prompt('Informe a justificativa do cancelamento da NFC-e (15 a 255 caracteres):');
+    const reason = window.prompt('Informe a justificativa do cancelamento da NF-e (15 a 255 caracteres):');
     if (!reason) return;
 
     try {
-      info('Cancelando NFC-e', `Enviando cancelamento de ${doc.reference || doc.id}.`);
+      info('Cancelando NF-e', `Enviando cancelamento de ${doc.reference || doc.id}.`);
       const response = await fetch('/api/fiscal/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId: doc.id, reason }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Erro ao cancelar NFC-e.');
-      success('NFC-e cancelada', `Documento fiscal: ${fiscalStatusLabels[result.document.status] || result.document.status}.`);
+      if (!response.ok) throw new Error(result.error || 'Erro ao cancelar NF-e.');
+      success('NF-e cancelada', `Documento fiscal: ${fiscalStatusLabels[result.document.status] || result.document.status}.`);
       await loadFiscalData();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Falha no cancelamento.';
@@ -278,11 +284,11 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
       {!embedded && (
         <>
           <div>
-            <Breadcrumb items={[{ label: 'Fiscal' }, { label: 'NFC-e' }]} />
+            <Breadcrumb items={[{ label: 'Fiscal' }, { label: 'NF-e' }]} />
             <div className="flex justify-between items-center mt-2 border-b border-brand-grey/15 pb-4">
               <div>
                 <h1 className="text-2xl font-black italic uppercase tracking-tight text-white">
-                  Emissão Fiscal NFC-e
+                  Emissão Fiscal NF-e
                 </h1>
                 <p className="text-xs text-brand-grey uppercase tracking-widest font-mono mt-1">
                   Monitore documentos fiscais e emita notas a partir de pedidos pagos reais
@@ -300,9 +306,9 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
         <div className="flex flex-col gap-3 border-b border-brand-grey/15 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-black uppercase italic text-white">Notas de peças e produtos</h2>
-            <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-brand-grey">Emissão e acompanhamento de NFC-e para pedidos pagos</p>
+            <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-brand-grey">Emissão e acompanhamento de NF-e para pedidos pagos</p>
           </div>
-          <Badge variant="neutral">NFC-e</Badge>
+          <Badge variant="neutral">NF-e</Badge>
         </div>
       )}
 
@@ -342,7 +348,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
                   <span className="text-sm font-black text-white italic">{money(order.total_amount)}</span>
                   <Button variant="primary" size="sm" disabled={isEmitting !== null} onClick={() => handleEmitInvoice(order)}>
                     <Plus className="w-3.5 h-3.5 mr-1" />
-                    {isEmitting === order.id ? 'Emitindo...' : 'Emitir NFC-e'}
+                    {isEmitting === order.id ? 'Emitindo...' : 'Emitir NF-e'}
                   </Button>
                 </div>
               </Card>
@@ -446,6 +452,18 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
           </Card>
         )}
       </div>
+
+      {selectedOrderId && (
+        <ReportDetailModal
+          kind={'sale'}
+          id={selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+          onFiscalIssued={() => {
+            setSelectedOrderId(null);
+            void loadFiscalData();
+          }}
+        />
+      )}
     </div>
   );
 }
