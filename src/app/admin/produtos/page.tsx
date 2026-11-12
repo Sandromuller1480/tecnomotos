@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Image as ImageIcon, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -38,6 +38,10 @@ interface Product {
   unit?: string | null;
   taxable_unit?: string | null;
   fiscal_status?: 'pending' | 'review_required' | 'complete';
+  last_purchase_cost?: number | null;
+  average_purchase_cost?: number | null;
+  last_purchase_at?: string | null;
+  preferred_supplier_id?: string | null;
 }
 
 const emptyForm: ProductFormState = {
@@ -62,7 +66,7 @@ const generatedSku = () => `TM-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
 export default function AdminProductsPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const toast = useToast();
+  const { error: showError, success: showSuccess } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [canEdit, setCanEdit] = useState(false);
@@ -76,11 +80,11 @@ export default function AdminProductsPage() {
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     setProducts((data || []) as Product[]);
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function load() {
@@ -95,13 +99,13 @@ export default function AdminProductsPage() {
         setCanEdit(Boolean(hasUpdate));
         await fetchProducts();
       } catch (error) {
-        toast.error('Erro ao carregar produtos', error instanceof Error ? error.message : 'Tente novamente.');
+        showError('Erro ao carregar produtos', error instanceof Error ? error.message : 'Tente novamente.');
       } finally {
         setIsLoading(false);
       }
     }
     load();
-  }, [router, supabase]);
+  }, [fetchProducts, router, showError, supabase]);
 
   const categories = useMemo(() => Array.from(new Set(products.map((product) => product.category).filter(Boolean) as string[])).sort(), [products]);
   const dirty = imageFile !== null || JSON.stringify(form) !== JSON.stringify(initialForm);
@@ -186,9 +190,9 @@ export default function AdminProductsPage() {
       const savedMode = modalMode;
       closeModal(true);
       await fetchProducts();
-      toast.success(savedMode === 'create' ? 'Produto salvo' : 'Alterações salvas', 'A classificação fiscal permanece pendente até que um perfil aprovado seja vinculado.');
+      showSuccess(savedMode === 'create' ? 'Produto salvo' : 'Alterações salvas', 'A classificação fiscal permanece pendente até que um perfil aprovado seja vinculado.');
     } catch (error) {
-      toast.error('Não foi possível salvar', error instanceof Error ? error.message : 'Tente novamente.');
+      showError('Não foi possível salvar', error instanceof Error ? error.message : 'Tente novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -200,13 +204,13 @@ export default function AdminProductsPage() {
       p_product_id: selectedProduct.id, p_quantity_delta: delta, p_reason: reason
     });
     if (error) {
-      toast.error('Ajuste não realizado', error.message);
+      showError('Ajuste não realizado', error.message);
       throw error;
     }
     const balance = Number(data);
     setSelectedProduct((current) => current ? { ...current, stock_quantity: balance } : current);
     setProducts((current) => current.map((product) => product.id === selectedProduct.id ? { ...product, stock_quantity: balance } : product));
-    toast.success('Estoque ajustado', `Novo saldo: ${balance}. A movimentação foi registrada.`);
+    showSuccess('Estoque ajustado', `Novo saldo: ${balance}. A movimentação foi registrada.`);
   };
 
   const syncProducts = async (productId?: string) => {
@@ -219,9 +223,9 @@ export default function AdminProductsPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Falha ao sincronizar.');
       await fetchProducts();
-      toast.success('Sincronização concluída', productId ? 'Produto atualizado no Stripe.' : `${result.syncedCount || 0} produtos processados.`);
+      showSuccess('Sincronização concluída', productId ? 'Produto atualizado no Stripe.' : `${result.syncedCount || 0} produtos processados.`);
     } catch (error) {
-      toast.error('Erro de sincronização', error instanceof Error ? error.message : 'Tente novamente.');
+      showError('Erro de sincronização', error instanceof Error ? error.message : 'Tente novamente.');
     } finally {
       setIsSyncingAll(false);
     }
@@ -249,16 +253,17 @@ export default function AdminProductsPage() {
         <div className="relative max-w-sm"><Input aria-label="Pesquisar produtos" placeholder="Pesquisar por SKU, nome, marca ou localização" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="pl-9 text-xs" /><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-grey" /></div>
         {isLoading ? <div className="space-y-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div> : (
           <Table>
-            <TableHeader><TableRow><TableHead>SKU</TableHead><TableHead>Produto</TableHead><TableHead>Preço</TableHead><TableHead>Estoque</TableHead><TableHead>Fiscal</TableHead><TableHead>Stripe</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>SKU</TableHead><TableHead>Produto</TableHead><TableHead>Preço de venda</TableHead><TableHead>Dados da compra</TableHead><TableHead>Estoque</TableHead><TableHead>Fiscal</TableHead><TableHead>Stripe</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
             <TableBody>{filteredProducts.map((product) => (
               <TableRow key={product.id}>
                 <TableCell className="font-mono text-brand-red"><span className="flex items-center gap-2">{product.image_url && <ImageIcon className="h-3.5 w-3.5 text-emerald-500" />}{product.sku}</span></TableCell>
                 <TableCell><p className="font-bold text-white">{product.name}</p><p className="text-[10px] text-brand-grey">{product.brand || 'Sem marca'} · {product.category || 'Sem categoria'}</p></TableCell>
                 <TableCell className="font-mono">R$ {Number(product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                <TableCell><p className="font-mono text-white">{product.last_purchase_cost == null ? 'Sem compra vinculada' : `Último: ${Number(product.last_purchase_cost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}</p><p className="text-[10px] text-brand-grey">{product.average_purchase_cost == null ? 'Custo médio indisponível' : `Médio: ${Number(product.average_purchase_cost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}{product.last_purchase_at ? ` · ${new Date(product.last_purchase_at).toLocaleDateString('pt-BR')}` : ''}</p></TableCell>
                 <TableCell className="font-mono">{Number(product.stock_quantity).toLocaleString('pt-BR')}</TableCell>
                 <TableCell><Badge variant={product.fiscal_status === 'complete' ? 'success' : product.fiscal_status === 'review_required' ? 'warning' : 'neutral'}>{product.fiscal_status === 'complete' ? 'Completo' : product.fiscal_status === 'review_required' ? 'Revisar' : 'Pendente'}</Badge></TableCell>
                 <TableCell><span className="flex items-center gap-2"><Badge variant={product.stripe_sync_status === 'synced' ? 'success' : product.stripe_sync_status === 'error' ? 'danger' : 'neutral'}>{product.stripe_sync_status === 'synced' ? 'Sincronizado' : product.stripe_sync_status === 'error' ? 'Erro' : 'Pendente'}</Badge>{canEdit && <button type="button" aria-label={`Sincronizar ${product.name}`} onClick={() => syncProducts(product.id)} className="text-brand-grey hover:text-brand-red"><RefreshCw className="h-3.5 w-3.5" /></button>}</span></TableCell>
-                <TableCell className="text-right">{canEdit ? <Button variant="secondary" size="sm" onClick={() => openEdit(product)}>Editar</Button> : <span className="text-[10px] uppercase text-brand-grey">Somente leitura</span>}</TableCell>
+                <TableCell className="text-right"><div className="flex justify-end gap-2"><Button href={`/admin/compras?produto=${product.id}`} variant="ghost" size="sm">Compras</Button>{canEdit ? <Button variant="secondary" size="sm" onClick={() => openEdit(product)}>Editar</Button> : <span className="text-[10px] uppercase text-brand-grey">Somente leitura</span>}</div></TableCell>
               </TableRow>
             ))}</TableBody>
           </Table>
@@ -266,6 +271,7 @@ export default function AdminProductsPage() {
       </Card>
       <ProductFormModal isOpen={modalMode !== null} mode={modalMode || 'create'} value={form}
         currentBalance={selectedProduct?.stock_quantity} fiscalStatus={selectedProduct?.fiscal_status}
+        purchaseInfo={selectedProduct ? { lastCost: selectedProduct.last_purchase_cost, averageCost: selectedProduct.average_purchase_cost, lastPurchaseAt: selectedProduct.last_purchase_at } : undefined}
         categories={categories} errors={fieldErrors} isSaving={isSaving} imageFile={imageFile}
         onChange={changeField} onImageChange={setImageFile} onClose={() => closeModal()}
         onSubmit={submitProduct} onAdjustStock={modalMode === 'edit' ? adjustStock : undefined} />

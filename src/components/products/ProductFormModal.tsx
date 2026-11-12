@@ -24,6 +24,7 @@ interface ProductFormModalProps {
   value: ProductFormState;
   currentBalance?: number;
   fiscalStatus?: 'pending' | 'review_required' | 'complete';
+  purchaseInfo?: { lastCost?: number | null; averageCost?: number | null; lastPurchaseAt?: string | null };
   categories: string[];
   errors: ProductFieldErrors;
   isSaving: boolean;
@@ -149,6 +150,13 @@ export function ProductFormModal(props: ProductFormModalProps) {
               <Input label="Ajuste (+ ou -)" type="number" step="0.001" value={adjustment} onChange={(e) => setAdjustment(e.target.value)} />
               <Input label="Motivo *" minLength={5} value={reason} onChange={(e) => setReason(e.target.value)} />
               <Button type="button" size="sm" disabled={adjusting || !adjustment || reason.trim().length < 5} onClick={adjust}>{adjusting ? 'Registrando...' : 'Registrar ajuste'}</Button>
+            </div>
+          )}
+          {props.mode === 'edit' && (
+            <div className="md:col-span-2 grid gap-3 border border-brand-grey/15 bg-black/20 p-3 md:grid-cols-3">
+              <div><p className="text-[10px] uppercase tracking-widest text-brand-grey">Último custo de compra</p><p className="mt-1 font-mono font-bold text-white">{props.purchaseInfo?.lastCost == null ? 'Sem compra vinculada' : Number(props.purchaseInfo.lastCost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div>
+              <div><p className="text-[10px] uppercase tracking-widest text-brand-grey">Custo médio</p><p className="mt-1 font-mono font-bold text-white">{props.purchaseInfo?.averageCost == null ? '—' : Number(props.purchaseInfo.averageCost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div>
+              <div><p className="text-[10px] uppercase tracking-widest text-brand-grey">Última entrada</p><p className="mt-1 font-mono font-bold text-white">{props.purchaseInfo?.lastPurchaseAt ? new Date(props.purchaseInfo.lastPurchaseAt).toLocaleDateString('pt-BR') : '—'}</p></div>
             </div>
           )}
         </Section>

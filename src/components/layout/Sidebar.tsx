@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Tag,
   Package,
+  PackagePlus,
   Warehouse,
   Users,
   Wrench,
@@ -87,6 +88,7 @@ export function Sidebar({ userRole = 'CUSTOMER', userPermissions = [], employeeF
       title: 'Catálogo',
       items: [
         { label: 'Produtos', href: '/admin/produtos', icon: Package, permission: 'products.view' },
+        { label: 'Compra de produtos', href: '/admin/compras', icon: PackagePlus, permission: 'purchases.view' },
         { label: 'Estoque', href: '/admin/estoque', icon: Warehouse, permission: 'inventory.view' },
       ],
     },
