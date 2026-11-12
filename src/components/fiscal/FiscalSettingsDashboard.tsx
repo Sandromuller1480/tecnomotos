@@ -149,10 +149,21 @@ export function FiscalSettingsDashboard({ initialTab = 'company', targetProductI
       ? 'Ela deixará de ser aplicada imediatamente a novas emissões.'
       : 'Esta ação não poderá ser desfeita pela tela.';
     if (!confirm(`Excluir permanentemente a regra "${rule.name}" v${rule.version}?\n\n${warning}\nOs documentos fiscais históricos serão preservados.`)) return;
-    await act(
-      supabase.from('fiscal_rules').delete().eq('id', rule.id),
-      'Regra fiscal excluída.'
-    );
+    setSaving(true); setError(''); setMessage('');
+    try {
+      const response = await fetch(`/api/fiscal/rules/${encodeURIComponent(rule.id)}`, { method: 'DELETE' });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) {
+        setError(result.error || 'Não foi possível excluir a regra fiscal.');
+        return;
+      }
+      setMessage('Regra fiscal excluída. Agora você pode aprovar a nova versão.');
+      await load();
+    } catch {
+      setError('Não foi possível excluir a regra fiscal.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return <div className="space-y-6 text-left">
