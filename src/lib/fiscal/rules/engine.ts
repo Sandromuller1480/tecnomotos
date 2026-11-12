@@ -10,7 +10,7 @@ export interface FiscalResolutionContext {
   destinationScope: DestinationScope;
   taxpayerIndicator: TaxpayerIndicator;
   purchasePurpose: PurchasePurpose;
-  operationType: 'sale';
+  operationType: 'sale' | 'purchase';
   documentModel: FiscalDocumentModel;
   occurredAt: Date;
 }
@@ -36,7 +36,7 @@ export interface FiscalRuleRecord {
   status: 'draft' | 'approved' | 'inactive';
   companyCrt: string;
   fiscalProfileId: string;
-  operationType: 'sale';
+  operationType: 'sale' | 'purchase';
   documentModel: FiscalDocumentModel;
   originScope: DestinationScope;
   destinationScope: DestinationScope;
