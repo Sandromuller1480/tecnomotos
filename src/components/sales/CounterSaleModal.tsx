@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Minus, Plus, ShoppingCart, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,137 @@ interface CustomerRow {
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+const normalizeSearch = (value: string) => value
+  .normalize('NFD')
+  .replace(/\p{Diacritic}/gu, '')
+  .toLocaleLowerCase('pt-BR');
+
+interface ProductComboboxProps {
+  products: ProductOption[];
+  productId: string;
+  isLoading: boolean;
+  onChange: (productId: string) => void;
+}
+
+function ProductCombobox({ products, productId, isLoading, onChange }: ProductComboboxProps) {
+  const selectedProduct = products.find((product) => product.id === productId);
+  const [query, setQuery] = useState(selectedProduct?.name || '');
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const normalizedQuery = normalizeSearch(query.trim());
+  const filteredProducts = normalizedQuery
+    ? products.filter((product) => normalizeSearch(`${product.name} ${product.sku || ''}`).includes(normalizedQuery))
+    : [];
+
+  const moveActiveOption = (nextIndex: number) => {
+    setActiveIndex(nextIndex);
+    window.requestAnimationFrame(() => optionRefs.current[nextIndex]?.scrollIntoView({ block: 'nearest' }));
+  };
+
+  const selectProduct = (product: ProductOption) => {
+    setQuery(product.name);
+    setIsOpen(false);
+    setActiveIndex(-1);
+    onChange(product.id);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'ArrowDown' && filteredProducts.length > 0) {
+      event.preventDefault();
+      setIsOpen(true);
+      moveActiveOption(Math.min(activeIndex + 1, filteredProducts.length - 1));
+      return;
+    }
+
+    if (event.key === 'ArrowUp' && filteredProducts.length > 0) {
+      event.preventDefault();
+      setIsOpen(true);
+      moveActiveOption(activeIndex <= 0 ? filteredProducts.length - 1 : activeIndex - 1);
+      return;
+    }
+
+    if (event.key === 'Enter' && isOpen) {
+      event.preventDefault();
+      const product = filteredProducts[activeIndex] || filteredProducts[0];
+      if (product) selectProduct(product);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setIsOpen(false);
+      setActiveIndex(-1);
+    }
+  };
+
+  const activeOptionId = isOpen && activeIndex >= 0 ? `counter-sale-product-${filteredProducts[activeIndex]?.id}` : undefined;
+
+  return (
+    <div className="relative min-w-0 flex-1">
+      <input
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={isOpen}
+        aria-controls="counter-sale-product-list"
+        aria-activedescendant={activeOptionId}
+        autoComplete="off"
+        disabled={isLoading}
+        value={query}
+        placeholder={isLoading ? 'Carregando produtos...' : 'Selecione um produto ou peça'}
+        onFocus={(event) => event.currentTarget.select()}
+        onChange={(event) => {
+          const nextQuery = event.target.value;
+          setQuery(nextQuery);
+          setActiveIndex(-1);
+          setIsOpen(nextQuery.trim().length > 0);
+          onChange('');
+        }}
+        onKeyDown={handleKeyDown}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 100)}
+        className={`w-full min-w-0 rounded border bg-brand-input px-3 py-2 text-xs font-mono focus:outline-none ${selectedProduct && selectedProduct.stock_quantity <= 0 ? 'border-brand-red text-brand-red focus:border-brand-red' : 'border-brand-grey/25 text-white focus:border-brand-red'}`}
+      />
+
+      {isOpen && (
+        <div id="counter-sale-product-list" role="listbox" className="absolute z-40 mt-1 max-h-64 w-full overflow-y-auto rounded border border-brand-grey/25 bg-brand-card shadow-2xl">
+          {filteredProducts.length === 0 ? (
+            <div className="px-3 py-3 text-xs font-mono text-brand-grey">Nenhum produto ou peça encontrado.</div>
+          ) : (
+            filteredProducts.map((product, index) => {
+              const isOutOfStock = product.stock_quantity <= 0;
+              const isActive = index === activeIndex;
+              return (
+                <button
+                  id={`counter-sale-product-${product.id}`}
+                  key={product.id}
+                  ref={(element) => { optionRefs.current[index] = element; }}
+                  type="button"
+                  role="option"
+                  aria-selected={isActive}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => selectProduct(product)}
+                  className={`block w-full border-l-4 px-3 py-2.5 text-left text-xs font-mono transition-colors ${
+                    isOutOfStock
+                      ? isActive ? 'border-brand-red bg-red-950/80 text-red-300' : 'border-brand-red bg-brand-red/10 text-brand-red hover:bg-brand-red/20'
+                      : isActive ? 'border-brand-red bg-brand-red text-white' : 'border-transparent text-brand-silver hover:bg-brand-grey/10 hover:text-white'
+                  }`}
+                >
+                  <span className="block font-bold">{product.name}</span>
+                  <span className={`mt-0.5 block text-[10px] ${isOutOfStock ? 'font-black text-brand-red' : 'text-brand-grey'}`}>
+                    {product.sku || 'SEM SKU'} · {isOutOfStock ? 'SEM ESTOQUE' : `${product.stock_quantity} un em estoque`} · {money(product.price)}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CounterSaleModal({ open, onClose, onCompleted, variant = 'modal' }: CounterSaleModalProps) {
   const supabase = useMemo(() => createClient(), []);
   const { success, error } = useToast();
@@ -49,6 +180,7 @@ export function CounterSaleModal({ open, onClose, onCompleted, variant = 'modal'
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [items, setItems] = useState<SaleItem[]>([]);
   const [productId, setProductId] = useState('');
+  const [productSearchKey, setProductSearchKey] = useState(0);
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -68,7 +200,6 @@ export function CounterSaleModal({ open, onClose, onCompleted, variant = 'modal'
           supabase
             .from('products')
             .select('id, name, sku, price, stock_quantity')
-            .gt('stock_quantity', 0)
             .order('name'),
           supabase
             .from('profiles')
@@ -106,6 +237,7 @@ export function CounterSaleModal({ open, onClose, onCompleted, variant = 'modal'
   const reset = () => {
     setItems([]);
     setProductId('');
+    setProductSearchKey((current) => current + 1);
     setCustomerId('');
     setCustomerName('');
     setCustomerEmail('');
@@ -123,6 +255,10 @@ export function CounterSaleModal({ open, onClose, onCompleted, variant = 'modal'
   const addProduct = () => {
     const product = products.find((option) => option.id === productId);
     if (!product) return;
+    if (product.stock_quantity <= 0) {
+      error('Produto sem estoque', `${product.name} está em falta no estoque.`);
+      return;
+    }
 
     setItems((current) => {
       const existing = current.find((item) => item.id === product.id);
@@ -136,6 +272,7 @@ export function CounterSaleModal({ open, onClose, onCompleted, variant = 'modal'
       return [...current, { ...product, quantity: 1 }];
     });
     setProductId('');
+    setProductSearchKey((current) => current + 1);
   };
 
   const changeQuantity = (id: string, delta: number) => {
@@ -190,6 +327,8 @@ export function CounterSaleModal({ open, onClose, onCompleted, variant = 'modal'
   };
 
   if (!open) return null;
+
+  const selectedProduct = products.find((product) => product.id === productId);
 
   const salePanel = (
       <Card className={variant === 'modal' ? 'relative max-h-[92vh] w-full max-w-5xl overflow-y-auto p-6' : 'relative w-full p-6'} withStripe>
@@ -261,20 +400,14 @@ export function CounterSaleModal({ open, onClose, onCompleted, variant = 'modal'
 
             <div className="space-y-4">
                 <div className="flex gap-2">
-                  <select
-                    value={productId}
-                    onChange={(event) => setProductId(event.target.value)}
-                    disabled={isLoading}
-                    className="min-w-0 flex-1 rounded border border-brand-grey/25 bg-brand-input px-3 py-2 text-xs font-mono text-white focus:border-brand-red focus:outline-none"
-                  >
-                    <option value="">{isLoading ? 'Carregando produtos...' : 'Selecione um produto ou peça'}</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} · {product.stock_quantity} un · {money(product.price)}
-                      </option>
-                    ))}
-                  </select>
-                  <Button type="button" variant="secondary" onClick={addProduct} disabled={!productId}>
+                  <ProductCombobox
+                    key={productSearchKey}
+                    products={products}
+                    productId={productId}
+                    isLoading={isLoading}
+                    onChange={setProductId}
+                  />
+                  <Button type="button" variant="secondary" onClick={addProduct} disabled={!productId || Boolean(selectedProduct && selectedProduct.stock_quantity <= 0)}>
                     <Plus className="h-4 w-4" /> Adicionar
                   </Button>
                 </div>
