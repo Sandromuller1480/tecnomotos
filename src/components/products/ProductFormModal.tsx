@@ -191,7 +191,7 @@ export function ProductFormModal(props: ProductFormModalProps) {
             <Input label="Estoque inicial" type="number" min="0" step="0.001" value={props.value.stockQuantity} error={props.errors.stockQuantity} onChange={(e) => props.onChange('stockQuantity', e.target.value)} />
           ) : (
             <div className="space-y-2">
-              <Input label="Saldo atual" value={String(props.currentBalance ?? 0)} readOnly aria-readonly="true" />
+              <Input label="Qtd atual no estoque" value={String(props.currentBalance ?? 0)} readOnly aria-readonly="true" />
               {props.onAdjustStock && <Button type="button" variant="secondary" size="sm" onClick={() => setShowAdjustment((current) => !current)}>Ajustar estoque</Button>}
             </div>
           )}
