@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { AlertTriangle, CheckCircle2, Image as ImageIcon, PackageSearch } from 'lucide-react';
-import { Modal } from '@/components/ui/modal';
+import { ConfirmDialog, Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -31,8 +31,8 @@ interface ProductFormModalProps {
   imageFile: File | null;
   onChange: (field: keyof ProductFormState, value: string | boolean) => void;
   onImageChange: (file: File | null) => void;
-  onClose: () => void;
-  onSubmit: (event: React.FormEvent) => void;
+  onClose: (force?: boolean) => void;
+  onSubmit: () => Promise<boolean>;
   onAdjustStock?: (delta: number, reason: string) => Promise<void>;
 }
 
@@ -89,6 +89,8 @@ export function ProductFormModal(props: ProductFormModalProps) {
   const [adjustment, setAdjustment] = useState('');
   const [reason, setReason] = useState('');
   const [adjusting, setAdjusting] = useState(false);
+  const [confirmationAction, setConfirmationAction] = useState<'discard' | 'save' | null>(null);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const previewUrl = useMemo(() => props.imageFile ? URL.createObjectURL(props.imageFile) : null, [props.imageFile]);
 
   useEffect(() => () => {
@@ -122,22 +124,47 @@ export function ProductFormModal(props: ProductFormModalProps) {
     }
   };
 
+  const requestClose = () => {
+    if (props.mode === 'edit') {
+      setConfirmationAction('discard');
+      return;
+    }
+    props.onClose();
+  };
+
+  const requestSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (props.mode === 'edit') {
+      setConfirmationAction('save');
+      return;
+    }
+    void props.onSubmit();
+  };
+
+  const confirmSave = async () => {
+    const saved = await props.onSubmit();
+    if (!saved) return;
+    setShowSaveSuccess(true);
+    window.setTimeout(() => setShowSaveSuccess(false), 2500);
+  };
+
   return (
-    <Modal
-      isOpen={props.isOpen}
-      onClose={props.onClose}
-      title={props.mode === 'create' ? 'Cadastrar novo produto' : 'Editar produto'}
-      size="xl"
-      footer={
-        <>
-          <Button type="button" variant="secondary" onClick={props.onClose} disabled={props.isSaving}>Cancelar</Button>
-          <Button type="submit" form="product-form" disabled={props.isSaving}>
-            {props.isSaving ? 'Salvando...' : props.mode === 'create' ? 'Salvar produto' : 'Salvar alterações'}
-          </Button>
-        </>
-      }
-    >
-      <form id="product-form" onSubmit={props.onSubmit} className="space-y-5 pr-1" noValidate>
+    <>
+      <Modal
+        isOpen={props.isOpen}
+        onClose={requestClose}
+        title={props.mode === 'create' ? 'Cadastrar novo produto' : 'Editar produto'}
+        size="xl"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={requestClose} disabled={props.isSaving}>Cancelar</Button>
+            <Button type="submit" form="product-form" disabled={props.isSaving}>
+              {props.isSaving ? 'Salvando...' : props.mode === 'create' ? 'Salvar produto' : 'Salvar alterações'}
+            </Button>
+          </>
+        }
+      >
+        <form id="product-form" onSubmit={requestSubmit} className="space-y-5 pr-1" noValidate>
         <Section title="A. Identificação">
           <div className="md:col-span-2">
             <Input label="Nome do produto *" autoFocus value={props.value.name} error={props.errors.name} onChange={(e) => props.onChange('name', e.target.value)} />
@@ -242,7 +269,42 @@ export function ProductFormModal(props: ProductFormModalProps) {
           </div>
         </Section>
         {Object.keys(props.errors).length > 0 && <Badge variant="danger">Revise os campos destacados antes de salvar.</Badge>}
-      </form>
-    </Modal>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={confirmationAction === 'discard'}
+        onClose={() => setConfirmationAction(null)}
+        onConfirm={() => props.onClose(true)}
+        title="Atenção"
+        message="DESEJA CANCELAR AS ALTERAÇÕES?"
+        cancelLabel="Cancelar"
+        confirmLabel="Confirmar"
+        isDanger
+      />
+
+      <ConfirmDialog
+        isOpen={confirmationAction === 'save'}
+        onClose={() => setConfirmationAction(null)}
+        onConfirm={() => void confirmSave()}
+        title="Confirmar alterações"
+        message="DESEJA SALVAR AS ALTERAÇÕES?"
+        cancelLabel="Cancelar"
+        confirmLabel="Confirmar"
+      />
+
+      {showSaveSuccess && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs" role="status" aria-live="polite">
+          <div className="mx-4 flex max-w-sm flex-col items-center gap-4 rounded border border-emerald-500/35 bg-brand-card p-8 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-200" style={{ borderLeft: '4px solid #10b981' }}>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/20 text-emerald-500">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-black uppercase leading-tight tracking-wider text-emerald-500">
+              ALTERAÇÃO SALVE COM SUCESSO!
+            </h3>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

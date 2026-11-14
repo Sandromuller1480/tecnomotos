@@ -150,9 +150,8 @@ export default function AdminProductsPage() {
     return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
   };
 
-  const submitProduct = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (isSaving || !modalMode) return;
+  const submitProduct = async () => {
+    if (isSaving || !modalMode) return false;
     const parsed = productFormSchema.safeParse({
       ...form, price: Number(form.price || 0), stockQuantity: Number(form.stockQuantity || 0), minStock: Number(form.minStock || 0)
     });
@@ -160,7 +159,7 @@ export default function AdminProductsPage() {
       const errors: ProductFieldErrors = {};
       for (const issue of parsed.error.issues) errors[issue.path[0] as keyof ProductFormState] = issue.message;
       setFieldErrors(errors);
-      return;
+      return false;
     }
 
     setIsSaving(true);
@@ -190,9 +189,13 @@ export default function AdminProductsPage() {
       const savedMode = modalMode;
       closeModal(true);
       await fetchProducts();
-      showSuccess(savedMode === 'create' ? 'Produto salvo' : 'Alterações salvas', 'A classificação fiscal permanece pendente até que um perfil aprovado seja vinculado.');
+      if (savedMode === 'create') {
+        showSuccess('Produto salvo', 'A classificação fiscal permanece pendente até que um perfil aprovado seja vinculado.');
+      }
+      return true;
     } catch (error) {
       showError('Não foi possível salvar', error instanceof Error ? error.message : 'Tente novamente.');
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -273,7 +276,7 @@ export default function AdminProductsPage() {
         currentBalance={selectedProduct?.stock_quantity} fiscalStatus={selectedProduct?.fiscal_status}
         purchaseInfo={selectedProduct ? { lastCost: selectedProduct.last_purchase_cost, averageCost: selectedProduct.average_purchase_cost, lastPurchaseAt: selectedProduct.last_purchase_at } : undefined}
         categories={categories} errors={fieldErrors} isSaving={isSaving} imageFile={imageFile}
-        onChange={changeField} onImageChange={setImageFile} onClose={() => closeModal()}
+        onChange={changeField} onImageChange={setImageFile} onClose={(force) => closeModal(force)}
         onSubmit={submitProduct} onAdjustStock={modalMode === 'edit' ? adjustStock : undefined} />
     </div>
   );
