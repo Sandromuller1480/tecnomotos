@@ -58,6 +58,23 @@ const unitOptions = [
   { value: 'M', label: 'M - Metro' }
 ];
 
+const brlCurrencyFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+
+function formatBrlCurrency(value: string) {
+  const amount = Number(value);
+  return brlCurrencyFormatter.format(Number.isFinite(amount) ? amount : 0);
+}
+
+function currencyInputToDecimal(value: string) {
+  const digits = value.replace(/\D/g, '');
+  return (Number(digits || '0') / 100).toFixed(2);
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <fieldset className="rounded border border-brand-grey/15 bg-black/15 p-4">
@@ -135,8 +152,41 @@ export function ProductFormModal(props: ProductFormModalProps) {
         </Section>
 
         <Section title="B. Preço e estoque">
-          <Input label="Preço de venda" type="number" min="0" step="0.01" value={props.value.price} error={props.errors.price} onChange={(e) => props.onChange('price', e.target.value)} />
-          <Input label="Estoque mínimo" type="number" min="0" step="0.001" value={props.value.minStock} error={props.errors.minStock} onChange={(e) => props.onChange('minStock', e.target.value)} />
+          <Input
+            label="Preço de venda"
+            type="text"
+            inputMode="numeric"
+            value={formatBrlCurrency(props.value.price)}
+            error={props.errors.price}
+            onFocus={(event) => {
+              if (Number(props.value.price || 0) === 0) event.currentTarget.select();
+            }}
+            onMouseUp={(event) => {
+              if (Number(props.value.price || 0) === 0) {
+                event.preventDefault();
+                event.currentTarget.select();
+              }
+            }}
+            onChange={(event) => props.onChange('price', currencyInputToDecimal(event.target.value))}
+          />
+          <Input
+            label="Estoque mínimo"
+            type="number"
+            min="0"
+            step="0.001"
+            value={props.value.minStock}
+            error={props.errors.minStock}
+            onFocus={(event) => {
+              if (Number(props.value.minStock || 0) === 0) event.currentTarget.select();
+            }}
+            onKeyDown={(event) => {
+              if (!event.ctrlKey && !event.metaKey && !event.altKey && Number(props.value.minStock || 0) === 0 && /^\d$/.test(event.key)) {
+                event.preventDefault();
+                props.onChange('minStock', event.key);
+              }
+            }}
+            onChange={(event) => props.onChange('minStock', event.target.value)}
+          />
           {props.mode === 'create' ? (
             <Input label="Estoque inicial" type="number" min="0" step="0.001" value={props.value.stockQuantity} error={props.errors.stockQuantity} onChange={(e) => props.onChange('stockQuantity', e.target.value)} />
           ) : (
