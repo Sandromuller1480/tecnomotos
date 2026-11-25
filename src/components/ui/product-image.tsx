@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 
 interface ProductImageProps {
@@ -23,11 +23,8 @@ export function ProductImage({
     return cleanUrl ? encodeURI(cleanUrl) : null;
   }, [src]);
 
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [imageSrc]);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = imageSrc !== null && failedSrc === imageSrc;
 
   if (!imageSrc || failed) {
     return (
@@ -45,7 +42,7 @@ export function ProductImage({
       src={imageSrc}
       alt={alt}
       className={cn('h-full w-full object-contain select-none', className)}
-      onError={() => setFailed(true)}
+      onError={() => setFailedSrc(imageSrc)}
     />
   );
 }

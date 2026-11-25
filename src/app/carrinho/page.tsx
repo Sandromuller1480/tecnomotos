@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { ProductImage } from '@/components/ui/product-image';
@@ -47,9 +46,10 @@ export default function CartPage() {
     const data = localStorage.getItem('tecnomotos-cart');
     if (data) {
       try {
-        setCart(JSON.parse(data));
-      } catch (e) {
-        setCart([]);
+        const storedCart = JSON.parse(data) as CartItem[];
+        queueMicrotask(() => setCart(storedCart));
+      } catch {
+        queueMicrotask(() => setCart([]));
       }
     }
   }, []);

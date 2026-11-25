@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, ClipboardList, ShoppingBag, ArrowRight } from 'lucide-react';
+import { CheckCircle2, ArrowRight } from 'lucide-react';
 
 interface OrderItemDetail {
   id: string;
@@ -31,16 +31,14 @@ interface OrderDetail {
 
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const supabase = createClient();
+  const sessionId = searchParams.get('session_id');
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const sessionId = searchParams.get('session_id');
+  const [isLoading, setIsLoading] = useState(Boolean(sessionId));
 
   useEffect(() => {
     if (!sessionId) {
-      setIsLoading(false);
       return;
     }
 
