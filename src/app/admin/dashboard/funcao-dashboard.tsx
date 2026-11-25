@@ -69,7 +69,10 @@ export async function FunctionDashboard({ kind }: { kind: DashboardKind }) {
     supabase.from('products').select('id', { count: 'exact', head: true }).lte('stock_quantity', 2)
   ]);
 
-  const revenue = (paidOrders || []).reduce((sum: number, order: any) => sum + (parseFloat(order.total_amount) || 0), 0);
+  const revenue = ((paidOrders || []) as Array<{ total_amount: number | string }>).reduce(
+    (sum, order) => sum + (parseFloat(String(order.total_amount)) || 0),
+    0
+  );
   const formatMoney = (value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   const metrics = [

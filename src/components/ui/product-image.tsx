@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils/cn';
 
 interface ProductImageProps {
@@ -38,9 +39,13 @@ export function ProductImage({
   }
 
   return (
-    <img
+    <Image
       src={imageSrc}
       alt={alt}
+      width={640}
+      height={640}
+      sizes="(max-width: 768px) 50vw, 320px"
+      unoptimized
       className={cn('h-full w-full object-contain select-none', className)}
       onError={() => setFailedSrc(imageSrc)}
     />

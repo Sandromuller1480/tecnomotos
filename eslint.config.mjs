@@ -6,10 +6,9 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
-    // Legacy modules still contain broad integration payloads. Keep the debt
-    // visible while allowing new functional lint errors to block the build.
+    // Keep unsafe broad payloads and accidental unused values from returning.
     rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },

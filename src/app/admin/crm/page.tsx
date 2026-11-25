@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage } from '@/lib/utils/error';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,20 @@ interface CrmInteraction {
     email: string;
     phone: string | null;
   };
+}
+
+interface CrmCustomerRow {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  customers: { document: string | null } | { document: string | null }[] | null;
+}
+
+interface CrmInteractionRow extends Omit<CrmInteraction, 'customer'> {
+  customer?: {
+    profiles?: CrmInteraction['customer'] | CrmInteraction['customer'][] | null;
+  } | null;
 }
 
 const typeLabels: Record<InteractionType, string> = {
@@ -118,10 +133,10 @@ export default function AdminCrmPage() {
 
     if (fetchErr) throw fetchErr;
 
-    const formatted = (data || []).map((item: any) => ({
+    const formatted = ((data || []) as CrmCustomerRow[]).map((item) => ({
         id: item.id,
         full_name: item.full_name,
-        email: item.email,
+        email: item.email || '',
         phone: item.phone,
         document: Array.isArray(item.customers) ? item.customers[0]?.document || null : item.customers?.document || null
       }));
@@ -156,7 +171,7 @@ export default function AdminCrmPage() {
 
     if (fetchErr) throw fetchErr;
 
-    const formatted = (data || []).map((item: any) => {
+    const formatted = ((data || []) as CrmInteractionRow[]).map((item) => {
       const profile = Array.isArray(item.customer?.profiles) ? item.customer.profiles[0] : item.customer?.profiles;
       return {
         id: item.id,
@@ -207,8 +222,8 @@ export default function AdminCrmPage() {
 
       try {
         await Promise.all([fetchCustomers(), fetchInteractions()]);
-      } catch (err: any) {
-        error('Erro ao carregar CRM', err.message || 'Falha ao buscar dados do CRM.');
+      } catch (err: unknown) {
+        error('Erro ao carregar CRM', getErrorMessage(err, 'Falha ao buscar dados do CRM.'));
       } finally {
         setIsLoading(false);
       }
@@ -257,8 +272,8 @@ export default function AdminCrmPage() {
       setShowSuccessOverlay(true);
       setTimeout(() => setShowSuccessOverlay(false), 2500);
       await fetchInteractions();
-    } catch (err: any) {
-      error('Erro ao salvar', err.message || 'Falha ao registrar interacao.');
+    } catch (err: unknown) {
+      error('Erro ao salvar', getErrorMessage(err, 'Falha ao registrar interação.'));
     } finally {
       setIsSaving(false);
     }
@@ -277,8 +292,8 @@ export default function AdminCrmPage() {
         item.id === interaction.id ? { ...item, status: nextStatus } : item
       )));
       success('CRM Atualizado', `Atendimento marcado como ${statusLabels[nextStatus]}.`);
-    } catch (err: any) {
-      error('Erro ao atualizar CRM', err.message);
+    } catch (err: unknown) {
+      error('Erro ao atualizar CRM', getErrorMessage(err, 'Falha ao atualizar atendimento.'));
     }
   };
 

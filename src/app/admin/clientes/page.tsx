@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage } from '@/lib/utils/error';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +36,10 @@ interface ProfileCustomer {
     birth_date: string | null;
   } | null;
 }
+
+type ProfileCustomerRow = Omit<ProfileCustomer, 'customers'> & {
+  customers: ProfileCustomer['customers'] | ProfileCustomer['customers'][];
+};
 
 interface Address {
   id: string;
@@ -154,7 +159,7 @@ export default function AdminCustomersPage() {
 
       if (fetchErr) throw fetchErr;
 
-      const formatted = (data || []).map((item: any) => ({
+      const formatted = ((data || []) as ProfileCustomerRow[]).map((item) => ({
         id: item.id,
         full_name: item.full_name,
         email: item.email,
@@ -375,8 +380,8 @@ export default function AdminCustomersPage() {
       }, 2500);
 
       await fetchCustomers();
-    } catch (err: any) {
-      error('Erro de Salvamento', err.message || 'Falha ao atualizar dados do cliente.');
+    } catch (err: unknown) {
+      error('Erro de Salvamento', getErrorMessage(err, 'Falha ao atualizar dados do cliente.'));
     } finally {
       setDetailSaving(false);
     }
@@ -489,8 +494,8 @@ export default function AdminCustomersPage() {
         .eq('customer_id', selectedCustomer.id)
         .order('is_default', { ascending: false });
       setAddresses(addrs || []);
-    } catch (err: any) {
-      error('Erro de Endereço', err.message);
+    } catch (err: unknown) {
+      error('Erro de Endereço', getErrorMessage(err, 'Falha ao salvar endereço.'));
     }
   };
 
@@ -526,8 +531,8 @@ export default function AdminCustomersPage() {
         .eq('customer_id', selectedCustomer.id)
         .order('is_default', { ascending: false });
       setAddresses(addrs || []);
-    } catch (err: any) {
-      error('Erro ao Excluir', err.message);
+    } catch (err: unknown) {
+      error('Erro ao Excluir', getErrorMessage(err, 'Falha ao excluir endereço.'));
     }
   };
 
@@ -583,8 +588,8 @@ export default function AdminCustomersPage() {
         .eq('customer_id', selectedCustomer.id)
         .order('brand', { ascending: true });
       setVehicles(vehs || []);
-    } catch (err: any) {
-      error('Erro de Veículo', err.message);
+    } catch (err: unknown) {
+      error('Erro de Veículo', getErrorMessage(err, 'Falha ao salvar veículo.'));
     }
   };
 
@@ -627,8 +632,8 @@ export default function AdminCustomersPage() {
         .eq('customer_id', selectedCustomer.id)
         .order('brand', { ascending: true });
       setVehicles(vehs || []);
-    } catch (err: any) {
-      error('Erro ao Excluir', err.message);
+    } catch (err: unknown) {
+      error('Erro ao Excluir', getErrorMessage(err, 'Falha ao excluir veículo.'));
     } finally {
       setDeleteVehicleSaving(false);
     }

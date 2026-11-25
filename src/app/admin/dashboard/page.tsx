@@ -21,6 +21,22 @@ interface OrderRow {
   created_at: string;
 }
 
+interface FinancialDashboardRow {
+  type: string;
+  status: string;
+  amount: number | string;
+  due_date: string | null;
+}
+
+interface ProductValueRow {
+  price: number | string;
+  stock_quantity: number | null;
+}
+
+interface QueryError {
+  message?: string;
+}
+
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const asNumber = (value: number | string | null | undefined) => parseFloat(String(value ?? 0)) || 0;
 const serviceStatusLabels: Record<string, string> = {
@@ -30,7 +46,7 @@ const serviceStatusLabels: Record<string, string> = {
   CANCELLED: 'Cancelado'
 };
 
-async function fetchOptional<T>(query: PromiseLike<{ data: T[] | null; error: any }>, tableName: string) {
+async function fetchOptional<T>(query: PromiseLike<{ data: T[] | null; error: QueryError | null }>, tableName: string) {
   const result = await query;
   if (result.error) {
     if (String(result.error.message || '').includes(tableName)) return [];
@@ -73,11 +89,13 @@ export default async function AdminDashboardPage() {
     )
   ]);
 
-  const currentMonthRevenue = (paidOrdersRes.data || []).reduce((sum, order: any) => sum + asNumber(order.total_amount), 0);
-  const inventoryValue = (productsRes.data || []).reduce((sum, product: any) => sum + asNumber(product.price) * (product.stock_quantity || 0), 0);
-  const weeklyPayables = financialRows
-    .filter((entry: any) => !entry.due_date || new Date(`${entry.due_date}T00:00:00`) <= weekEnd)
-    .reduce((sum: number, entry: any) => sum + asNumber(entry.amount), 0);
+  const currentMonthRevenue = ((paidOrdersRes.data || []) as Array<Pick<OrderRow, 'total_amount'>>)
+    .reduce((sum, order) => sum + asNumber(order.total_amount), 0);
+  const inventoryValue = ((productsRes.data || []) as ProductValueRow[])
+    .reduce((sum, product) => sum + asNumber(product.price) * (product.stock_quantity || 0), 0);
+  const weeklyPayables = (financialRows as FinancialDashboardRow[])
+    .filter((entry) => !entry.due_date || new Date(`${entry.due_date}T00:00:00`) <= weekEnd)
+    .reduce((sum, entry) => sum + asNumber(entry.amount), 0);
 
   const metrics = [
     {

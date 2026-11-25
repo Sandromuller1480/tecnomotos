@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage } from '@/lib/utils/error';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -118,6 +120,36 @@ interface ServiceOrderProductRow extends Omit<ServiceOrderProduct, 'quantity' | 
   total_price: number | string | null;
 }
 
+interface RelationProfileRow {
+  full_name: string | null;
+}
+
+interface ServiceOrderQueryRow extends Omit<ServiceOrder, 'total_price' | 'customer' | 'vehicle' | 'mechanic'> {
+  total_price: number | string;
+  customer?: { profiles?: RelationProfileRow | RelationProfileRow[] | null } | Array<{ profiles?: RelationProfileRow | RelationProfileRow[] | null }> | null;
+  vehicle?: ServiceOrder['vehicle'] | ServiceOrder['vehicle'][] | null;
+  employee?: { profiles?: RelationProfileRow | RelationProfileRow[] | null } | Array<{ profiles?: RelationProfileRow | RelationProfileRow[] | null }> | null;
+}
+
+interface WorkshopCustomerRow {
+  id: string;
+  full_name: string;
+  customers: { id: string } | { id: string }[] | null;
+}
+
+interface WorkshopEmployeeRow {
+  id: string;
+  profiles?: RelationProfileRow | RelationProfileRow[] | null;
+}
+
+interface ChecklistRow {
+  id: string;
+  label: string;
+  status: ChecklistStatus;
+  notes: string | null;
+  sort_order: number;
+}
+
 const DEFAULT_CHECKLIST_ITEMS: ChecklistItem[] = [
   { label: 'Carenagens e pintura', status: 'OK', notes: '', sort_order: 1 },
   { label: 'Retrovisores', status: 'OK', notes: '', sort_order: 2 },
@@ -215,18 +247,21 @@ export default function AdminWorkshopPage() {
 
       if (fetchErr) throw fetchErr;
 
-      const formatted = (data || []).map((so: any) => {
+      const formatted = ((data || []) as ServiceOrderQueryRow[]).map((so) => {
         // Resolve customer profile
-        const custProfile = so.customer?.profiles;
+        const customerRelation = Array.isArray(so.customer) ? so.customer[0] : so.customer;
+        const custProfile = customerRelation?.profiles;
         const custName = Array.isArray(custProfile) 
           ? custProfile[0]?.full_name 
           : custProfile?.full_name || 'Desconhecido';
 
         // Resolve mechanic profile
-        const mechProfile = so.employee?.profiles;
+        const employeeRelation = Array.isArray(so.employee) ? so.employee[0] : so.employee;
+        const mechProfile = employeeRelation?.profiles;
         const mechName = Array.isArray(mechProfile)
           ? mechProfile[0]?.full_name
           : mechProfile?.full_name || 'Não alocado';
+        const vehicleRelation = Array.isArray(so.vehicle) ? so.vehicle[0] : so.vehicle;
 
         return {
           id: so.id,
@@ -236,14 +271,14 @@ export default function AdminWorkshopPage() {
           service_type: so.service_type,
           description: so.description,
           status: so.status,
-          total_price: parseFloat(so.total_price) || 0,
+          total_price: parseFloat(String(so.total_price)) || 0,
           notes: so.notes,
           created_at: so.created_at,
           customer: { full_name: custName },
-          vehicle: so.vehicle ? {
-            brand: so.vehicle.brand,
-            model: so.vehicle.model,
-            plate: so.vehicle.plate
+          vehicle: vehicleRelation ? {
+            brand: vehicleRelation.brand,
+            model: vehicleRelation.model,
+            plate: vehicleRelation.plate
           } : undefined,
           mechanic: { full_name: mechName }
         };
@@ -269,9 +304,9 @@ export default function AdminWorkshopPage() {
         `)
         .order('full_name');
 
-      const formattedCusts = (custs || [])
-        .filter((item: any) => item.customers)
-        .map((item: any) => ({
+      const formattedCusts = ((custs || []) as WorkshopCustomerRow[])
+        .filter((item) => item.customers)
+        .map((item) => ({
           id: item.id,
           full_name: item.full_name
         }));
@@ -287,7 +322,7 @@ export default function AdminWorkshopPage() {
           )
         `);
 
-      const formattedEmps = (emps || []).map((item: any) => {
+      const formattedEmps = ((emps || []) as WorkshopEmployeeRow[]).map((item) => {
         const p = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
         return {
           id: item.id,
@@ -531,8 +566,8 @@ export default function AdminWorkshopPage() {
       }, 2500);
 
       await fetchServiceOrders();
-    } catch (err: any) {
-      error('Erro ao salvar', err.message || 'Falha ao criar OS.');
+    } catch (err: unknown) {
+      error('Erro ao salvar', getErrorMessage(err, 'Falha ao criar OS.'));
     } finally {
       setIsSaving(false);
     }
@@ -566,7 +601,7 @@ export default function AdminWorkshopPage() {
       .order('sort_order', { ascending: true });
 
     setEChecklistItems((checklist || []).length > 0
-      ? (checklist || []).map((item: any) => ({
+      ? ((checklist || []) as ChecklistRow[]).map((item) => ({
           id: item.id,
           label: item.label,
           status: item.status as ChecklistStatus,
@@ -672,8 +707,8 @@ export default function AdminWorkshopPage() {
       }, 2500);
 
       await fetchServiceOrders();
-    } catch (err: any) {
-      error('Erro de Atualização', err.message);
+    } catch (err: unknown) {
+      error('Erro de Atualização', getErrorMessage(err, 'Falha ao atualizar OS.'));
     }
   };
 
@@ -694,8 +729,8 @@ export default function AdminWorkshopPage() {
 
       setServiceOrderPhotos((current) => current.filter((item) => item.id !== photo.id));
       success('Foto Excluida', 'Registro fotografico removido.');
-    } catch (err: any) {
-      error('Erro ao excluir foto', err.message);
+    } catch (err: unknown) {
+      error('Erro ao excluir foto', getErrorMessage(err, 'Falha ao excluir foto.'));
     }
   };
 
@@ -719,8 +754,8 @@ export default function AdminWorkshopPage() {
       success('Situação atualizada', `Ordem de serviço movida para ${statusLabels[status]}.`);
       setIsDetailModalOpen(false);
       await fetchServiceOrders();
-    } catch (err: any) {
-      error('Erro ao atualizar a situação', err.message);
+    } catch (err: unknown) {
+      error('Erro ao atualizar a situação', getErrorMessage(err, 'Falha ao atualizar situação.'));
     }
   };
 
@@ -1383,7 +1418,16 @@ export default function AdminWorkshopPage() {
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {serviceOrderPhotos.map((photo) => (
                         <div key={photo.id} className="relative border border-brand-grey/15 rounded overflow-hidden bg-brand-input">
-                          <img src={photo.image_url} alt={photo.caption || 'Foto da motocicleta'} className="w-full h-28 object-cover" />
+                          <div className="relative h-28 w-full">
+                            <Image
+                              src={photo.image_url}
+                              alt={photo.caption || 'Foto da motocicleta'}
+                              fill
+                              sizes="(max-width: 768px) 50vw, 33vw"
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleDeletePhoto(photo)}

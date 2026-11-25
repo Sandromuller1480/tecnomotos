@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage } from '@/lib/utils/error';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,10 @@ interface ServiceOrderRow {
   total_price: number | string;
   created_at: string;
 }
+
+type ManualFinancialRow = Omit<FinancialEntry, 'amount' | 'isAutomatic'> & {
+  amount: number | string;
+};
 
 const statusLabels: Record<FinancialStatus, string> = {
   PENDING: 'Pendente',
@@ -159,9 +164,9 @@ export default function AdminFinancialPage() {
         const missingTable = manualRes.error.message.includes('financial_transactions');
         if (!missingTable) throw manualRes.error;
       } else {
-        manualEntries.push(...(manualRes.data || []).map((entry: any) => ({
+        manualEntries.push(...((manualRes.data || []) as ManualFinancialRow[]).map((entry) => ({
           ...entry,
-          amount: parseFloat(entry.amount) || 0,
+          amount: parseFloat(String(entry.amount)) || 0,
           isAutomatic: false
         })));
       }
@@ -188,8 +193,8 @@ export default function AdminFinancialPage() {
       ));
 
       setEntries(combined);
-    } catch (err: any) {
-      error('Erro ao carregar financeiro', err.message || 'Falha ao buscar o fluxo de caixa.');
+    } catch (err: unknown) {
+      error('Erro ao carregar financeiro', getErrorMessage(err, 'Falha ao buscar o fluxo de caixa.'));
     } finally {
       setIsLoading(false);
     }
@@ -269,8 +274,8 @@ export default function AdminFinancialPage() {
       setShowSuccessOverlay(true);
       setTimeout(() => setShowSuccessOverlay(false), 2500);
       await fetchFinancialData();
-    } catch (err: any) {
-      error('Erro ao salvar', err.message || 'Falha ao registrar lançamento financeiro.');
+    } catch (err: unknown) {
+      error('Erro ao salvar', getErrorMessage(err, 'Falha ao registrar lançamento financeiro.'));
     } finally {
       setIsSaving(false);
     }
@@ -292,8 +297,8 @@ export default function AdminFinancialPage() {
 
       success('Financeiro atualizado', `Lançamento marcado como ${statusLabels[nextStatus]}.`);
       await fetchFinancialData();
-    } catch (err: any) {
-      error('Erro ao atualizar', err.message);
+    } catch (err: unknown) {
+      error('Erro ao atualizar', getErrorMessage(err, 'Falha ao atualizar lançamento.'));
     }
   };
 

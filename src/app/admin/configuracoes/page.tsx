@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage } from '@/lib/utils/error';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -62,8 +63,8 @@ export default function AdminSettingsPage() {
       setSyncedCount(synced || 0);
       setErrorCount(errs || 0);
       setLastSynced(latest?.[0]?.stripe_last_synced_at || null);
-    } catch (e: any) {
-      console.warn('[Settings] Failed to fetch Stripe stats:', e.message);
+    } catch (err: unknown) {
+      console.warn('[Settings] Failed to fetch Stripe stats:', getErrorMessage(err, 'Erro desconhecido.'));
     } finally {
       setIsLoading(false);
     }
@@ -114,8 +115,8 @@ export default function AdminSettingsPage() {
 
       success('Sincronizado', 'Produtos sincronizados com sucesso no Stripe.');
       await fetchStripeStats();
-    } catch (err: any) {
-      error('Erro ao sincronizar', err.message);
+    } catch (err: unknown) {
+      error('Erro ao sincronizar', getErrorMessage(err, 'Falha ao sincronizar produtos.'));
     } finally {
       setIsSyncing(false);
     }

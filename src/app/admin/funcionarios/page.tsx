@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage } from '@/lib/utils/error';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,10 @@ interface Employee {
     status: string;
   };
 }
+
+type EmployeeRow = Omit<Employee, 'profiles'> & {
+  profiles?: Employee['profiles'] | Employee['profiles'][];
+};
 
 const functionLabels: Record<EmployeeFunction, string> = {
   SELLER: 'Vendedor',
@@ -86,14 +91,14 @@ export default function AdminEmployeesPage() {
 
       if (fetchErr) throw fetchErr;
 
-      setEmployees((data || []).map((item: any) => ({
+      setEmployees(((data || []) as EmployeeRow[]).map((item) => ({
         id: item.id,
         document: item.document,
         employee_function: item.employee_function,
         profiles: Array.isArray(item.profiles) ? item.profiles[0] : item.profiles
       })));
-    } catch (err: any) {
-      error('Erro ao carregar funcionários', err.message || 'Falha ao buscar equipe.');
+    } catch (err: unknown) {
+      error('Erro ao carregar funcionários', getErrorMessage(err, 'Falha ao buscar equipe.'));
     } finally {
       setIsLoading(false);
     }

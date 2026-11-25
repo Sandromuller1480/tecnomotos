@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage } from '@/lib/utils/error';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/card';
@@ -218,8 +219,8 @@ export default function CustomerDashboard() {
       setTimeout(() => {
         setShowSuccessOverlay(false);
       }, 2500);
-    } catch (err: any) {
-      error('Falha ao Salvar', err.message || 'Ocorreu um erro.');
+    } catch (err: unknown) {
+      error('Falha ao Salvar', getErrorMessage(err, 'Ocorreu um erro.'));
     } finally {
       setIsSavingInfo(false);
     }
@@ -280,8 +281,8 @@ export default function CustomerDashboard() {
 
       resetAddressForm();
       await loadCustomerData(userId);
-    } catch (err: any) {
-      error('Erro de Endereço', err.message);
+    } catch (err: unknown) {
+      error('Erro de Endereço', getErrorMessage(err, 'Falha ao salvar endereço.'));
     }
   };
 
@@ -311,8 +312,8 @@ export default function CustomerDashboard() {
 
       success('Endereço Excluído', 'Endereço removido.');
       await loadCustomerData(userId);
-    } catch (err: any) {
-      error('Erro ao Excluir', err.message);
+    } catch (err: unknown) {
+      error('Erro ao Excluir', getErrorMessage(err, 'Falha ao excluir endereço.'));
     }
   };
 
@@ -362,8 +363,8 @@ export default function CustomerDashboard() {
 
       resetVehicleForm();
       await loadCustomerData(userId);
-    } catch (err: any) {
-      error('Erro de Veículo', err.message);
+    } catch (err: unknown) {
+      error('Erro de Veículo', getErrorMessage(err, 'Falha ao salvar veículo.'));
     }
   };
 
@@ -392,8 +393,8 @@ export default function CustomerDashboard() {
 
       success('Moto Excluída', 'Moto removida.');
       await loadCustomerData(userId);
-    } catch (err: any) {
-      error('Erro ao Excluir', err.message);
+    } catch (err: unknown) {
+      error('Erro ao Excluir', getErrorMessage(err, 'Falha ao excluir veículo.'));
     }
   };
 
