@@ -66,7 +66,7 @@ export default function CheckoutSuccessPage() {
           .single();
 
         if (error) throw error;
-        setOrder(data as any);
+        setOrder(data as unknown as OrderDetail);
       } catch (e) {
         console.error('[Success Page] Failed to fetch order details:', e);
       } finally {
@@ -75,7 +75,7 @@ export default function CheckoutSuccessPage() {
     }
 
     fetchOrderDetails();
-  }, [sessionId]);
+  }, [sessionId, supabase]);
 
   return (
     <div className="flex flex-col min-h-screen bg-brand-black text-white">

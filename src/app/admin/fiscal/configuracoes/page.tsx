@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ShieldAlert, Check, AlertTriangle, Play, RefreshCw, Lock, Save } from 'lucide-react';
+import { ShieldAlert, Check, Play, RefreshCw, Lock, Save } from 'lucide-react';
 
 interface FiscalSettings {
   id: string;
@@ -105,7 +105,7 @@ export default function AdminFiscalSettingsPage() {
     }
 
     loadSettings();
-  }, []);
+  }, [error, router, supabase]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,7 +138,7 @@ export default function AdminFiscalSettingsPage() {
           .select()
           .single();
       } else {
-        const { id, ...newPayload } = payload;
+        const { id: _id, ...newPayload } = payload;
         result = await supabase
           .from('fiscal_settings')
           .insert(newPayload)

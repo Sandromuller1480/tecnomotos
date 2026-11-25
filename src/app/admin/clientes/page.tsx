@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -18,12 +18,6 @@ import {
   Search,
   X,
   Check,
-  Phone,
-  Mail,
-  FileText,
-  MapPin,
-  Bike,
-  Calendar,
   Trash2,
   Edit,
   UserCheck
@@ -140,7 +134,7 @@ export default function AdminCustomersPage() {
   const [vehVin, setVehVin] = useState('');
   const [vehMileage, setVehMileage] = useState('');
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     try {
       const { data, error: fetchErr } = await supabase
         .from('profiles')
@@ -176,7 +170,7 @@ export default function AdminCustomersPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -206,7 +200,7 @@ export default function AdminCustomersPage() {
     }
 
     checkAuthAndLoad();
-  }, []);
+  }, [fetchCustomers, router, supabase]);
 
   const resetCreateForm = () => {
     setCName('');

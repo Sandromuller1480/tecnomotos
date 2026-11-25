@@ -18,8 +18,9 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ received: true, message: result.message });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[Stripe Webhook Endpoint Error]:', err);
-    return NextResponse.json({ error: err.message || 'Erro interno no webhook' }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Erro interno no webhook';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

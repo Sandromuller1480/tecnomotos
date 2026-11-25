@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -27,7 +27,7 @@ export default function AdminInventoryPage() {
   const [isLoading, setIsLoading] = useState(true);
 
 
-  const loadInventory = async () => {
+  const loadInventory = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('products')
@@ -43,7 +43,7 @@ export default function AdminInventoryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -68,7 +68,7 @@ export default function AdminInventoryPage() {
     }
 
     checkAuthAndLoad();
-  }, []);
+  }, [loadInventory, router, supabase]);
 
   // Filter products to buy: stock_quantity <= min_stock_quantity
   const productsToBuy = products.filter(p => p.stock_quantity <= p.min_stock_quantity);

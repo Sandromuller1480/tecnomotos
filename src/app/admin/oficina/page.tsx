@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -17,14 +17,10 @@ import {
   Search,
   X,
   Check,
-  User,
-  Bike,
   ClipboardList,
-  Calendar,
   AlertTriangle,
   Play,
   CheckSquare,
-  Slash,
   Camera,
   ImageIcon,
   Trash2
@@ -182,7 +178,7 @@ export default function AdminWorkshopPage() {
   const [serviceOrderPhotos, setServiceOrderPhotos] = useState<ServiceOrderPhoto[]>([]);
   const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
 
-  const fetchServiceOrders = async () => {
+  const fetchServiceOrders = useCallback(async () => {
     try {
       const { data, error: fetchErr } = await supabase
         .from('service_orders')
@@ -259,9 +255,9 @@ export default function AdminWorkshopPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
-  const fetchFormOptions = async () => {
+  const fetchFormOptions = useCallback(async () => {
     try {
       // Fetch customers
       const { data: custs } = await supabase
@@ -315,7 +311,7 @@ export default function AdminWorkshopPage() {
     } catch (e) {
       console.warn('[Workshop] Error fetching form options:', e);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -346,7 +342,7 @@ export default function AdminWorkshopPage() {
     }
 
     checkAuthAndLoad();
-  }, []);
+  }, [fetchFormOptions, fetchServiceOrders, router, supabase]);
 
   // Fetch vehicles dynamic filter
   useEffect(() => {
@@ -366,7 +362,7 @@ export default function AdminWorkshopPage() {
     }
 
     fetchCustomerVehicles();
-  }, [selectedCustId]);
+  }, [selectedCustId, supabase]);
 
   const updateChecklistItem = (
     setter: React.Dispatch<React.SetStateAction<ChecklistItem[]>>,

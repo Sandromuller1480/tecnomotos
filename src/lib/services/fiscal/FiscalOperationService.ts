@@ -1,11 +1,67 @@
-import { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
+import type { createAdminClient } from '@/lib/supabase/admin';
 import { createFiscalProvider, getFiscalRuntimeConfig } from './FiscalProviderFactory';
 import { validateNfeSale } from './validateNfeSale';
-import { FiscalCompanySettings, FiscalDocumentStatus, FiscalSale, FiscalServiceOrder, ProviderFiscalResult } from './types';
+import { FiscalCompanySettings, FiscalDocumentStatus, FiscalSale, FiscalSaleItem, FiscalServiceOrder, ProviderFiscalResult } from './types';
 import { FiscalResolutionContext, FiscalRuleRecord, resolveFiscalItem } from '@/lib/fiscal/rules/engine';
 
-type DatabaseClient = SupabaseClient<any, 'public', any>;
+type DatabaseClient = ReturnType<typeof createAdminClient>;
+
+interface FiscalCustomerRow {
+  document?: string | null;
+  state_registration?: string | null;
+  icms_taxpayer_indicator?: FiscalSale['taxpayerIndicator'];
+  purchase_purpose?: FiscalSale['purchasePurpose'];
+}
+
+interface FiscalAddressRow {
+  street?: string | null;
+  number?: string | null;
+  complement?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+}
+
+interface FiscalOrderProductRow {
+  id?: string;
+  sku?: string;
+  name?: string;
+  gtin?: string | null;
+  barcode?: string | null;
+  ncm?: string | null;
+  cest?: string | null;
+  cfop?: string | null;
+  cst?: string | null;
+  csosn?: string | null;
+  origin?: number | string | null;
+  fiscal_origin?: number | string | null;
+  unit?: string | null;
+  taxable_unit?: string | null;
+  without_gtin?: boolean | null;
+  fiscal_status?: FiscalSaleItem['fiscalStatus'] | null;
+  fiscal_tax_profile_id?: string | null;
+}
+
+interface FiscalOrderItemRow {
+  id: string;
+  item_type?: string | null;
+  description?: string | null;
+  quantity?: number | string | null;
+  unit_price?: number | string | null;
+  products?: FiscalOrderProductRow | FiscalOrderProductRow[] | null;
+}
+
+type FiscalRuleDbRow = {
+  id: string; name: string; version: number; status: FiscalRuleRecord['status']; company_crt: string;
+  fiscal_profile_id: string; operation_type: FiscalRuleRecord['operationType']; document_model: FiscalRuleRecord['documentModel'];
+  origin_scope: FiscalRuleRecord['originScope']; destination_scope: FiscalRuleRecord['destinationScope']; destination_uf: string | null;
+  taxpayer_indicator: FiscalRuleRecord['taxpayerIndicator']; purchase_purpose: FiscalRuleRecord['purchasePurpose']; cfop: string;
+  csosn: string | null; cst_icms: string | null; tax_parameters: Record<string, unknown> | null;
+  valid_from: string; valid_to: string | null; approved_by: string | null;
+  approved_at: string | null; source: string | null;
+};
 
 const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
 
@@ -322,19 +378,20 @@ export class FiscalOperationService {
     if (error || !order) throw new Error('Venda nao encontrada para emissao fiscal.');
     if (order.status !== 'paid') throw new Error('A NF-e so pode ser emitida para pedido com pagamento aprovado.');
 
-    let customer: any = null;
-    let address: any = null;
+    let customer: FiscalCustomerRow | null = null;
+    let address: FiscalAddressRow | null = null;
     if (order.customer_id) {
       const customerResult = await this.db.from('customers').select('document, state_registration, icms_taxpayer_indicator, purchase_purpose').eq('id', order.customer_id).maybeSingle();
-      customer = customerResult.data;
+      customer = customerResult.data as FiscalCustomerRow | null;
       const addressQuery = this.db.from('customer_addresses').select('street, number, complement, neighborhood, city, state, postal_code').eq('customer_id', order.customer_id);
       const addressResult = order.delivery_address_id
         ? await addressQuery.eq('id', order.delivery_address_id).maybeSingle()
         : await addressQuery.eq('is_default', true).maybeSingle();
-      address = addressResult.data;
+      address = addressResult.data as FiscalAddressRow | null;
     }
 
-    const items = (order.order_items || []).filter((item: any) => item.item_type !== 'SERVICE').map((item: any) => {
+    const orderItems = (order.order_items || []) as FiscalOrderItemRow[];
+    const items = orderItems.filter((item) => item.item_type !== 'SERVICE').map((item) => {
       const product = Array.isArray(item.products) ? item.products[0] : item.products;
       return {
         id: item.id,
@@ -348,10 +405,14 @@ export class FiscalOperationService {
         cfop: product?.cfop,
         cst: product?.cst,
         csosn: product?.csosn,
-        origin: product?.fiscal_origin ?? product?.origin,
+        origin: product?.fiscal_origin != null
+          ? Number(product.fiscal_origin)
+          : product?.origin != null
+            ? Number(product.origin)
+            : undefined,
         unit: product?.taxable_unit || product?.unit,
         gtin: product?.gtin || product?.barcode
-        ,withoutGtin: product?.without_gtin
+        ,withoutGtin: product?.without_gtin ?? undefined
         ,fiscalStatus: product?.fiscal_status || 'pending'
         ,fiscalProfileId: product?.fiscal_tax_profile_id
       };
@@ -391,12 +452,12 @@ export class FiscalOperationService {
     const documentModel = '55' as const;
     const { data, error } = await this.db.from('fiscal_rules').select('*').eq('status', 'approved');
     if (error) throw new Error(`Não foi possível carregar as regras fiscais: ${error.message}`);
-    const rules: FiscalRuleRecord[] = (data || []).map((rule: any) => ({
+    const rules: FiscalRuleRecord[] = ((data || []) as FiscalRuleDbRow[]).map((rule) => ({
       id: rule.id, name: rule.name, version: rule.version, status: rule.status, companyCrt: rule.company_crt,
       fiscalProfileId: rule.fiscal_profile_id, operationType: rule.operation_type, documentModel: rule.document_model,
       originScope: rule.origin_scope, destinationScope: rule.destination_scope, destinationUf: rule.destination_uf,
       taxpayerIndicator: rule.taxpayer_indicator, purchasePurpose: rule.purchase_purpose, cfop: rule.cfop,
-      csosn: rule.csosn, cstIcms: rule.cst_icms, taxParameters: rule.tax_parameters,
+      csosn: rule.csosn, cstIcms: rule.cst_icms, taxParameters: rule.tax_parameters || undefined,
       validFrom: rule.valid_from, validTo: rule.valid_to, approvedBy: rule.approved_by, approvedAt: rule.approved_at, source: rule.source
     }));
     const context: FiscalResolutionContext = {
@@ -614,7 +675,7 @@ export class FiscalOperationService {
     };
     const contextHash = createHash('sha256').update(JSON.stringify(contextSnapshot)).digest('hex');
     const { data: current } = await this.db.from('fiscal_previews').select('id,context_hash').eq('sale_id', orderId).eq('status', 'ready');
-    const same = (current || []).find((preview: any) => preview.context_hash === contextHash);
+    const same = (current || []).find((preview: { id: string; context_hash: string }) => preview.context_hash === contextHash);
     if (same) return same;
     if (current?.length) {
       await this.db.from('fiscal_previews').update({ status: 'invalidated', invalidated_at: new Date().toISOString() }).eq('sale_id', orderId).eq('status', 'ready');

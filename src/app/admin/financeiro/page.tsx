@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -103,7 +103,7 @@ export default function AdminFinancialPage() {
   const [entryStatus, setEntryStatus] = useState<FinancialStatus>('PENDING');
   const [notes, setNotes] = useState('');
 
-  const buildAutomaticEntries = (orders: OrderRow[], serviceOrders: ServiceOrderRow[]) => {
+  const buildAutomaticEntries = useCallback((orders: OrderRow[], serviceOrders: ServiceOrderRow[]) => {
     const orderEntries: FinancialEntry[] = orders
       .filter((order) => order.status === 'paid')
       .map((order) => ({
@@ -143,9 +143,9 @@ export default function AdminFinancialPage() {
       }));
 
     return [...orderEntries, ...serviceEntries];
-  };
+  }, []);
 
-  const fetchFinancialData = async () => {
+  const fetchFinancialData = useCallback(async () => {
     setIsLoading(true);
     try {
       const manualEntries: FinancialEntry[] = [];
@@ -193,7 +193,7 @@ export default function AdminFinancialPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [buildAutomaticEntries, error, supabase]);
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -224,7 +224,7 @@ export default function AdminFinancialPage() {
     }
 
     checkAuthAndLoad();
-  }, []);
+  }, [fetchFinancialData, router, supabase]);
 
   const resetForm = () => {
     setEntryType('INCOME');

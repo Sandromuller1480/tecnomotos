@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -69,12 +69,6 @@ const statusLabels: Record<CrmStatus, string> = {
   CANCELLED: 'Cancelado'
 };
 
-const priorityLabels: Record<CrmPriority, string> = {
-  LOW: 'Baixa',
-  NORMAL: 'Normal',
-  HIGH: 'Alta'
-};
-
 function interactionIcon(type: InteractionType) {
   if (type === 'CALL') return <Phone className="w-4 h-4" />;
   if (type === 'WHATSAPP') return <MessageCircle className="w-4 h-4" />;
@@ -108,7 +102,7 @@ export default function AdminCrmPage() {
   const [status, setStatus] = useState<CrmStatus>('OPEN');
   const [followUpAt, setFollowUpAt] = useState('');
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     const { data, error: fetchErr } = await supabase
       .from('profiles')
       .select(`
@@ -133,9 +127,9 @@ export default function AdminCrmPage() {
       }));
 
     setCustomers(formatted);
-  };
+  }, [supabase]);
 
-  const fetchInteractions = async () => {
+  const fetchInteractions = useCallback(async () => {
     const { data, error: fetchErr } = await supabase
       .from('customer_crm_interactions')
       .select(`
@@ -184,7 +178,7 @@ export default function AdminCrmPage() {
     });
 
     setInteractions(formatted as CrmInteraction[]);
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function loadCrm() {
@@ -221,7 +215,7 @@ export default function AdminCrmPage() {
     }
 
     loadCrm();
-  }, []);
+  }, [error, fetchCustomers, fetchInteractions, router, supabase]);
 
   const resetForm = () => {
     setCustomerId('');

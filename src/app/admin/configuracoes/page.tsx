@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -31,7 +31,7 @@ export default function AdminSettingsPage() {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const fetchStripeStats = async () => {
+  const fetchStripeStats = useCallback(async () => {
     try {
       // 1. Get synced count
       const { count: synced, error: syncErr } = await supabase
@@ -67,7 +67,7 @@ export default function AdminSettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -98,7 +98,7 @@ export default function AdminSettingsPage() {
     }
 
     checkAuthAndLoad();
-  }, []);
+  }, [fetchStripeStats, router, supabase]);
 
   const handleSyncPendingAndErrors = async () => {
     setIsSyncing(true);

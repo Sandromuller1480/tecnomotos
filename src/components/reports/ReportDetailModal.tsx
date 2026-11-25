@@ -361,7 +361,6 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
 
                 if (!hasProducts && !hasServices) return null;
 
-                const estimatedNfe = true;
                 const showAddress = true;
                 const selectClass = 'w-full border border-brand-grey/20 bg-brand-darkgrey px-3 py-2.5 text-xs text-white focus:border-brand-red focus:outline-none';
 

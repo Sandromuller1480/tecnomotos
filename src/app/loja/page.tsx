@@ -2,7 +2,6 @@ import React from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Flame, ShoppingBag, Compass, Wrench, Shield } from 'lucide-react';
 

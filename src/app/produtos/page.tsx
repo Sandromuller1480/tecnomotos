@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -13,12 +12,21 @@ import { ProductImage } from '@/components/ui/product-image';
 import { useRouter } from 'next/navigation';
 
 interface Product {
-  id?: string;
+  id: string;
   sku: string;
   name: string;
   brand: string;
   price: number;
   category: string;
+  image_url?: string;
+}
+
+interface CartItem {
+  id: string;
+  sku: string;
+  name: string;
+  price: number;
+  quantity: number;
   image_url?: string;
 }
 
@@ -40,7 +48,7 @@ export default function PublicProductsPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   const handleAddToCart = (product: Product) => {
     if (!isAuthenticated) {
@@ -49,16 +57,16 @@ export default function PublicProductsPage() {
     }
 
     const cartData = localStorage.getItem('tecnomotos-cart');
-    let cart = [];
+    let cart: CartItem[] = [];
     if (cartData) {
       try {
-        cart = JSON.parse(cartData);
-      } catch (e) {
+        cart = JSON.parse(cartData) as CartItem[];
+      } catch {
         cart = [];
       }
     }
 
-    const existing = cart.find((item: any) => item.id === product.id);
+    const existing = cart.find((item) => item.id === product.id);
     if (existing) {
       existing.quantity += 1;
     } else {
@@ -97,11 +105,11 @@ export default function PublicProductsPage() {
     }
 
     loadProducts();
-  }, [isAuthenticated]);
+  }, [supabase]);
 
   return (
     <div className="flex flex-col min-h-screen bg-brand-black text-white">
-      <Navbar isAuthenticated={false} />
+      <Navbar isAuthenticated={isAuthenticated} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8 text-left">
         <div>

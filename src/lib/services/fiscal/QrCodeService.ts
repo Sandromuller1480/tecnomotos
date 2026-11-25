@@ -19,7 +19,6 @@ export class QrCodePayloadBuilder {
       ? 'https://www.sefaz.mt.gov.br/nfce/consultanfce'
       : 'https://homologacao.sefaz.mt.gov.br/nfce/consultanfce';
 
-    const cleanCnpj = params.chNFe.substring(6, 20);
     const dateHex = Buffer.from(params.dhEmi).toString('hex');
     const totalVal = params.vNF.toFixed(2);
     

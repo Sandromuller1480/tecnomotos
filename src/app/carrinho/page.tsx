@@ -39,7 +39,7 @@ export default function CartPage() {
         setIsAuthenticated(true);
       }
     });
-  }, []);
+  }, [router, supabase]);
 
   // Load cart from localStorage
   useEffect(() => {
@@ -94,8 +94,11 @@ export default function CartPage() {
 
       // Redirect to Stripe Checkout page
       window.location.href = data.url;
-    } catch (err: any) {
-      error('Checkout Falhou', err.message || 'Houve uma falha ao iniciar o fluxo de pagamento.');
+    } catch (err: unknown) {
+      const message = err instanceof Error
+        ? err.message
+        : 'Houve uma falha ao iniciar o fluxo de pagamento.';
+      error('Checkout Falhou', message);
       setIsProcessing(false);
     }
   };

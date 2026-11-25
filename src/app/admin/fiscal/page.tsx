@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -109,7 +109,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
   const [isEmitting, setIsEmitting] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     const { data: docs, error: fetchErr } = await supabase
       .from('fiscal_documents')
       .select('*')
@@ -119,9 +119,9 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
     if (fetchErr) throw fetchErr;
     setDocuments(docs || []);
     return docs || [];
-  };
+  }, [supabase]);
 
-  const fetchPaidOrders = async (currentDocuments: FiscalDocument[]) => {
+  const fetchPaidOrders = useCallback(async (currentDocuments: FiscalDocument[]) => {
     const { data, error: fetchErr } = await supabase
       .from('orders')
       .select(`
@@ -166,9 +166,9 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
         order_items: (order.order_items || []).filter((item) => item.item_type !== 'SERVICE')
       }))
       .filter((order) => (order.order_items?.length || 0) > 0));
-  };
+  }, [supabase]);
 
-  const loadFiscalData = async () => {
+  const loadFiscalData = useCallback(async () => {
     setIsLoading(true);
     try {
       const docs = await fetchDocuments();
@@ -179,7 +179,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [error, fetchDocuments, fetchPaidOrders]);
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -203,7 +203,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
     }
 
     checkAuthAndLoad();
-  }, []);
+  }, [loadFiscalData, router, supabase]);
 
   const pendingOrders = useMemo(() => orders.filter((order) => (order.order_items || []).length > 0), [orders]);
 

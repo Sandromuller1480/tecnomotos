@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
@@ -9,7 +9,6 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/states';
@@ -94,7 +93,7 @@ export default function CustomerDashboard() {
   const [vehVin, setVehVin] = useState('');
   const [vehMileage, setVehMileage] = useState('');
 
-  const loadCustomerData = async (uid: string) => {
+  const loadCustomerData = useCallback(async (uid: string) => {
     try {
       // 1. Get profile and customer details
       const { data: profile } = await supabase
@@ -147,7 +146,7 @@ export default function CustomerDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function checkAuth() {
@@ -182,7 +181,7 @@ export default function CustomerDashboard() {
     }
 
     checkAuth();
-  }, []);
+  }, [error, loadCustomerData, router, supabase]);
 
   const handleUpdateInfo = async (e: React.FormEvent) => {
     e.preventDefault();

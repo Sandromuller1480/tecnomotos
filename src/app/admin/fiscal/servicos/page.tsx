@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, CheckCircle, FileText, Plus, RefreshCw, XCircle } from 'lucide-react';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -90,7 +90,7 @@ export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }
   const [isLoading, setIsLoading] = useState(true);
   const [isEmitting, setIsEmitting] = useState<string | null>(null);
 
-  const loadFiscalData = async () => {
+  const loadFiscalData = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data: docs, error: docsError } = await supabase
@@ -133,7 +133,7 @@ export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [error, supabase]);
 
   useEffect(() => {
     async function authorizeAndLoad() {
@@ -157,7 +157,7 @@ export function FiscalServicesPanel({ embedded = false }: { embedded?: boolean }
     }
 
     authorizeAndLoad();
-  }, []);
+  }, [loadFiscalData, router, supabase]);
 
   const pendingServiceOrders = useMemo(() => {
     const issuedIds = new Set(documents.map((document) => document.order_id));

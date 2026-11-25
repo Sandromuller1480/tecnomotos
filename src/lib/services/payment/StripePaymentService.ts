@@ -19,7 +19,7 @@ export class StripePaymentService extends PaymentService {
     this.secretKey = process.env.STRIPE_SECRET_KEY || '';
     this.mode = process.env.STRIPE_MODE || 'test';
     this.stripe = new Stripe(this.secretKey, {
-      apiVersion: '2025-01-27.acacia' as any
+      apiVersion: '2026-08-26.dahlia'
     });
   }
 
@@ -231,7 +231,7 @@ export class StripePaymentService extends PaymentService {
     sessionId: string,
     paymentIntentId: string,
     userId: string | null,
-    supabase: any
+    supabase: ReturnType<typeof createAdminClient>
   ) {
     console.log(`[Stripe Webhook] Confirming payment for order: ${orderId}`);
 
@@ -320,7 +320,7 @@ export class StripePaymentService extends PaymentService {
     }
 
     const stripe = new Stripe(secretKey, {
-      apiVersion: '2025-01-27.acacia' as any
+      apiVersion: '2026-08-26.dahlia'
     });
 
     const supabase = createAdminClient();
@@ -428,8 +428,10 @@ export class StripePaymentService extends PaymentService {
       }
 
       return { success: true };
-    } catch (err: any) {
-      const errMsg = err?.message || 'Erro inesperado ao sincronizar com Stripe.';
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error
+        ? err.message
+        : 'Erro inesperado ao sincronizar com Stripe.';
       console.error(`[Stripe Sync Error] Sync failed for product ${productId}:`, errMsg);
 
       await supabase
@@ -462,8 +464,12 @@ export class StripePaymentService extends PaymentService {
       }
 
       return { success: true, syncedCount: count };
-    } catch (e: any) {
-      return { success: false, syncedCount: 0, error: e.message };
+    } catch (error: unknown) {
+      return {
+        success: false,
+        syncedCount: 0,
+        error: error instanceof Error ? error.message : 'Erro inesperado ao sincronizar produtos.'
+      };
     }
   }
 }

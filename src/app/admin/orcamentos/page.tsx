@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -272,7 +272,7 @@ export default function AdminQuotationsPage() {
   const [generatePdf, setGeneratePdf] = useState(true);
   const [items, setItems] = useState<QuotationItemForm[]>([emptyItem()]);
 
-  const fetchQuotations = async () => {
+  const fetchQuotations = useCallback(async () => {
     const { data, error: fetchErr } = await supabase
       .from('quotations')
       .select(`
@@ -335,9 +335,9 @@ export default function AdminQuotationsPage() {
         }))
       };
     }));
-  };
+  }, [supabase]);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     const { data, error: fetchErr } = await supabase
       .from('profiles')
       .select(`
@@ -359,9 +359,9 @@ export default function AdminQuotationsPage() {
         email: profile.email || '',
         phone: profile.phone || null
       })));
-  };
+  }, [supabase]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     const { data } = await supabase
       .from('products')
       .select('id, name, sku, price')
@@ -371,7 +371,7 @@ export default function AdminQuotationsPage() {
       ...product,
       price: parseFloat(String(product.price)) || 0
     })));
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -412,7 +412,7 @@ export default function AdminQuotationsPage() {
     }
 
     checkAuthAndLoad();
-  }, []);
+  }, [fetchCustomers, fetchProducts, fetchQuotations, router, supabase]);
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => {

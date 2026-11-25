@@ -130,7 +130,7 @@ export class MockFiscalService extends FiscalService {
     series: string,
     startNumber: number,
     endNumber: number,
-    justification: string
+    _justification: string
   ): Promise<InvalidateNumberResult> {
     console.log(`[Fiscal Mock] Invalidation requested for numbers: ${startNumber}-${endNumber} Series: ${series}`);
     return {
@@ -158,7 +158,7 @@ export class MockFiscalService extends FiscalService {
   async processEvent(
     documentId: string,
     eventType: string,
-    payload: Record<string, unknown>
+    _payload: Record<string, unknown>
   ): Promise<{ success: boolean; protocol?: string; sefazCode: string; sefazMessage: string }> {
     console.log(`[Fiscal Mock] Processing event: ${eventType} for doc: ${documentId}`);
     return {

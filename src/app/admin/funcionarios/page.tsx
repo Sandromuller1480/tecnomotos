@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -67,7 +67,7 @@ export default function AdminEmployeesPage() {
   const [state, setState] = useState('');
   const [postalCode, setPostalCode] = useState('');
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
       const { data, error: fetchErr } = await supabase
         .from('employees')
@@ -97,7 +97,7 @@ export default function AdminEmployeesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [error, supabase]);
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -127,7 +127,7 @@ export default function AdminEmployeesPage() {
     }
 
     checkAuthAndLoad();
-  }, []);
+  }, [fetchEmployees, router, supabase]);
 
   const resetForm = () => {
     setFullName('');

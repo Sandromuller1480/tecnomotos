@@ -182,7 +182,7 @@ export class SefazMtFiscalService extends FiscalService {
   /**
    * Local status lookup helper.
    */
-  async getNfceStatus(documentId: string): Promise<NfceStatusResult> {
+  async getNfceStatus(_documentId: string): Promise<NfceStatusResult> {
     return {
       status: 'AUTHORIZED',
       sefazCode: '100',
@@ -288,7 +288,7 @@ export class SefazMtFiscalService extends FiscalService {
         lastCheck: new Date().toISOString(),
         environment: this.environment,
       };
-    } catch (err: unknown) {
+    } catch {
       return {
         status: 'OFFLINE',
         lastCheck: new Date().toISOString(),
@@ -301,9 +301,9 @@ export class SefazMtFiscalService extends FiscalService {
    * Processes events.
    */
   async processEvent(
-    documentId: string,
-    eventType: string,
-    payload: Record<string, unknown>
+    _documentId: string,
+    _eventType: string,
+    _payload: Record<string, unknown>
   ): Promise<{ success: boolean; protocol?: string; sefazCode: string; sefazMessage: string }> {
     this.checkProductionBlock();
     return {

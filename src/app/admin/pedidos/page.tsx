@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
@@ -64,7 +64,7 @@ export default function AdminOrdersPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       const { data, error: fetchErr } = await supabase
         .from('orders')
@@ -135,7 +135,7 @@ export default function AdminOrdersPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function checkAuthAndLoad() {
@@ -160,7 +160,7 @@ export default function AdminOrdersPage() {
     }
 
     checkAuthAndLoad();
-  }, []);
+  }, [fetchOrders, router, supabase]);
 
   const handleOpenDetails = (o: Order) => {
     setSelectedOrder(o);

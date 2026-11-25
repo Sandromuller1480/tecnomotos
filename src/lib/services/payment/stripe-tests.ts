@@ -1,5 +1,3 @@
-import { StripePaymentService } from './StripePaymentService';
-
 function assert(condition: boolean, message: string) {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -165,8 +163,8 @@ async function runStripeTests() {
     console.log('\n==================================================');
     console.log('TODOS OS TESTES UNITÁRIOS DO STRIPE PASSARAM COM SUCESSO!');
     console.log('==================================================');
-  } catch (err: any) {
-    console.error('\n[TEST FAILURE]', err.message);
+  } catch (err: unknown) {
+    console.error('\n[TEST FAILURE]', err instanceof Error ? err.message : err);
     process.exit(1);
   }
 }
