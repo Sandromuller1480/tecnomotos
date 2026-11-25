@@ -48,7 +48,15 @@ interface Purchase {
   purchase_order_items: PurchaseItem[]; purchase_documents: PurchaseDocument[];
 }
 
-interface ItemForm { productId: string; quantity: string; unitCost: string; supplierCode: string; discount: string; notes: string }
+interface ItemForm {
+  productId: string;
+  quantity: string;
+  unitCost: string;
+  supplierCode: string;
+  discount: string;
+  notes: string;
+  xmlProduct?: NfeItemData;
+}
 interface PurchaseForm {
   id: string | null; supplierId: string; issueDate: string; expectedDate: string; invoiceNumber: string; invoiceSeries: string;
   invoiceAccessKey: string; paymentTerms: string; paymentMethod: string; freight: string; discount: string; notes: string; items: ItemForm[];
@@ -95,11 +103,21 @@ function xmlItemsToForm(data: NfeImportData, supplierId: string, products: Produ
     unitCost: String(item.unitCost),
     supplierCode: item.supplierCode,
     discount: '0',
-    notes: `Item ${item.lineNumber} do XML: ${item.name}`
+    notes: `Item ${item.lineNumber} do XML: ${item.name}`,
+    xmlProduct: item
   }));
   const merged: ItemForm[] = [];
   for (const item of imported) {
-    const existing = item.productId ? merged.find((entry) => entry.productId === item.productId) : undefined;
+    const xmlIdentity = normalizedText(item.supplierCode)
+      || normalizedDigits(item.xmlProduct.gtin)
+      || normalizedText(item.xmlProduct.name);
+    const existing = merged.find((entry) => item.productId
+      ? entry.productId === item.productId
+      : !entry.productId && (
+        normalizedText(entry.supplierCode)
+        || normalizedDigits(entry.xmlProduct?.gtin)
+        || normalizedText(entry.xmlProduct?.name)
+      ) === xmlIdentity);
     if (!existing) {
       merged.push(item);
       continue;
@@ -222,6 +240,7 @@ export default function PurchasesPage() {
         || suppliers.find((entry) => [entry.legal_name, entry.trade_name].some((name) => normalizedText(name) === normalizedText(data.supplier.legalName)));
       const items = xmlItemsToForm(data, supplier?.id || '', products, purchases);
       const matchedItems = items.filter((item) => item.productId).length;
+      const newItems = items.length - matchedItems;
       setPurchaseForm({
         id: null,
         supplierId: supplier?.id || '',
@@ -240,7 +259,12 @@ export default function PurchasesPage() {
       setFiles([file]);
       setXmlImport({ data, fileName: file.name });
       setTab('purchases');
-      showSuccess('XML reconhecido', `${matchedItems} de ${items.length} produto(s) associado(s) automaticamente.`);
+      showSuccess(
+        'XML reconhecido',
+        newItems > 0
+          ? `${matchedItems} produto(s) localizado(s) e ${newItems} novo(s) serão cadastrados ao confirmar.`
+          : `Todos os ${matchedItems} produto(s) foram associados automaticamente.`
+      );
     } catch (error) {
       showError('Não foi possível importar o XML', error instanceof Error ? error.message : 'Verifique o arquivo selecionado.');
     } finally {
@@ -266,10 +290,16 @@ export default function PurchasesPage() {
   const savePurchase = async (receiveAfterSave = false) => {
     if (!purchaseForm || saving) return;
     const canCreateXmlSupplier = Boolean(xmlImport?.data.supplier.legalName);
-    if ((!purchaseForm.supplierId && !canCreateXmlSupplier) || !purchaseForm.items.length || purchaseForm.items.some((item) => !item.productId || Number(item.quantity) <= 0 || Number(item.unitCost) < 0)) {
+    const invalidItem = purchaseForm.items.some((item) => (
+      (!item.productId && !item.xmlProduct)
+      || Number(item.quantity) <= 0
+      || Number(item.unitCost) < 0
+    ));
+    if ((!purchaseForm.supplierId && !canCreateXmlSupplier) || !purchaseForm.items.length || invalidItem) {
       return showError('Revise a compra', 'Informe o fornecedor e todos os produtos, quantidades e custos.');
     }
-    if (new Set(purchaseForm.items.map((item) => item.productId)).size !== purchaseForm.items.length) {
+    const selectedProductIds = purchaseForm.items.map((item) => item.productId).filter(Boolean);
+    if (new Set(selectedProductIds).size !== selectedProductIds.length) {
       return showError('Produto duplicado', 'Agrupe a quantidade do produto em uma única linha.');
     }
     if (receiveAfterSave && !permissions.receive) return showError('Sem permissão', 'Seu usuário não pode receber compras no estoque.');
@@ -300,7 +330,23 @@ export default function PurchasesPage() {
         p_invoice_series: purchaseForm.invoiceSeries || null, p_invoice_access_key: purchaseForm.invoiceAccessKey || null,
         p_payment_terms: purchaseForm.paymentTerms || null, p_payment_method: purchaseForm.paymentMethod || null,
         p_freight_amount: Number(purchaseForm.freight || 0), p_discount_amount: Number(purchaseForm.discount || 0), p_notes: purchaseForm.notes || null,
-        p_items: purchaseForm.items.map((item) => ({ product_id: item.productId, quantity: Number(item.quantity), unit_cost: Number(item.unitCost), supplier_product_code: item.supplierCode || null, discount_amount: Number(item.discount || 0), notes: item.notes || null }))
+        p_items: purchaseForm.items.map((item) => ({
+          product_id: item.productId || null,
+          quantity: Number(item.quantity),
+          unit_cost: Number(item.unitCost),
+          supplier_product_code: item.supplierCode || null,
+          discount_amount: Number(item.discount || 0),
+          notes: item.notes || null,
+          xml_product: item.xmlProduct ? {
+            name: item.xmlProduct.name,
+            gtin: item.xmlProduct.gtin || null,
+            ncm: item.xmlProduct.ncm || null,
+            cest: item.xmlProduct.cest || null,
+            fiscal_origin: item.xmlProduct.fiscalOrigin || null,
+            commercial_unit: item.xmlProduct.commercialUnit || null,
+            taxable_unit: item.xmlProduct.taxableUnit || null
+          } : null
+        }))
       });
       if (error) throw error;
       const purchaseId = String(data);
@@ -426,11 +472,12 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 function PurchaseEditor({ form, products, suppliers, files, saving, total, xmlImport, canReceive, setFiles, setField, setItem, addItem, removeItem, close, save }: { form: PurchaseForm | null; products: Product[]; suppliers: Supplier[]; files: File[]; saving: boolean; total: number; xmlImport: { data: NfeImportData; fileName: string } | null; canReceive: boolean; setFiles: (files: File[]) => void; setField: <K extends keyof PurchaseForm>(key: K, value: PurchaseForm[K]) => void; setItem: (index: number, patch: Partial<ItemForm>) => void; addItem: () => void; removeItem: (index: number) => void; close: () => void; save: (receiveAfterSave?: boolean) => void }) {
   if (!form) return null;
   const unmatchedItems = form.items.filter((item) => !item.productId).length;
-  const footer = xmlImport ? <><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="secondary" disabled={saving || unmatchedItems > 0} onClick={() => save(false)}>Salvar rascunho</Button><Button disabled={saving || unmatchedItems > 0 || !canReceive} onClick={() => save(true)}><PackageCheck className="h-4 w-4" />{saving ? 'Recebendo...' : 'Importar e receber estoque'}</Button></> : <><Button variant="ghost" onClick={close}>Cancelar</Button><Button disabled={saving} onClick={() => save(false)}>{saving ? 'Salvando...' : 'Salvar rascunho'}</Button></>;
+  const incompleteItems = form.items.filter((item) => !item.productId && !item.xmlProduct).length;
+  const footer = xmlImport ? <><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="secondary" disabled={saving || incompleteItems > 0} onClick={() => save(false)}>Salvar rascunho</Button><Button disabled={saving || incompleteItems > 0 || !canReceive} onClick={() => save(true)}><PackageCheck className="h-4 w-4" />{saving ? 'Recebendo...' : 'Importar e receber estoque'}</Button></> : <><Button variant="ghost" onClick={close}>Cancelar</Button><Button disabled={saving} onClick={() => save(false)}>{saving ? 'Salvando...' : 'Salvar rascunho'}</Button></>;
   return <Modal isOpen onClose={close} title={xmlImport ? 'Importar compra por XML' : form.id ? 'Editar compra' : 'Nova compra de produtos'} size="xl" footer={footer}><div className="space-y-5">
-    {xmlImport && <section className={`border p-4 ${unmatchedItems ? 'border-amber-500/40 bg-amber-500/5' : 'border-emerald-500/35 bg-emerald-500/5'}`}><div className="flex items-start gap-3"><FileUp className={`mt-0.5 h-5 w-5 ${unmatchedItems ? 'text-amber-400' : 'text-emerald-400'}`} /><div><h4 className="font-bold uppercase text-white">XML da NF-e reconhecido</h4><p className="mt-1 text-xs text-brand-grey">{xmlImport.fileName} · NF {xmlImport.data.invoiceNumber || '—'} · {xmlImport.data.supplier.tradeName || xmlImport.data.supplier.legalName}</p><p className={`mt-2 text-xs font-bold ${unmatchedItems ? 'text-amber-400' : 'text-emerald-400'}`}>{unmatchedItems ? `${unmatchedItems} item(ns) ainda precisam ser associados a um produto cadastrado.` : 'Todos os itens foram associados. A compra está pronta para atualizar o estoque.'}</p>{!form.supplierId && <p className="mt-1 text-xs text-amber-400">O fornecedor do XML será cadastrado automaticamente ao confirmar.</p>}</div></div></section>}
+    {xmlImport && <section className={`border p-4 ${unmatchedItems ? 'border-amber-500/40 bg-amber-500/5' : 'border-emerald-500/35 bg-emerald-500/5'}`}><div className="flex items-start gap-3"><FileUp className={`mt-0.5 h-5 w-5 ${unmatchedItems ? 'text-amber-400' : 'text-emerald-400'}`} /><div><h4 className="font-bold uppercase text-white">XML da NF-e reconhecido</h4><p className="mt-1 text-xs text-brand-grey">{xmlImport.fileName} · NF {xmlImport.data.invoiceNumber || '—'} · {xmlImport.data.supplier.tradeName || xmlImport.data.supplier.legalName}</p><p className={`mt-2 text-xs font-bold ${unmatchedItems ? 'text-amber-400' : 'text-emerald-400'}`}>{unmatchedItems ? `${unmatchedItems} produto(s) novo(s) serão cadastrados automaticamente ao confirmar.` : 'Todos os itens foram associados. A compra está pronta para atualizar o estoque.'}</p>{unmatchedItems > 0 && <p className="mt-1 text-xs text-brand-grey">Eles entrarão com preço de venda zerado e revisão fiscal pendente, sem aparecer na loja até a conferência.</p>}{!form.supplierId && <p className="mt-1 text-xs text-amber-400">O fornecedor do XML será cadastrado automaticamente ao confirmar.</p>}</div></div></section>}
     <section className="grid gap-4 md:grid-cols-3"><Select label="Fornecedor *" value={form.supplierId} options={[{ value: '', label: xmlImport ? 'Fornecedor do XML (cadastro automático)' : 'Selecione' }, ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.trade_name || supplier.legal_name }))]} onChange={(event) => setField('supplierId', event.target.value)} /><Input label="Data de emissão *" type="date" value={form.issueDate} onChange={(event) => setField('issueDate', event.target.value)} /><Input label="Previsão de entrega" type="date" value={form.expectedDate} onChange={(event) => setField('expectedDate', event.target.value)} /><Input label="Número da nota" value={form.invoiceNumber} onChange={(event) => setField('invoiceNumber', event.target.value)} /><Input label="Série" value={form.invoiceSeries} onChange={(event) => setField('invoiceSeries', event.target.value)} /><Input label="Chave da NF-e (44 dígitos)" maxLength={44} value={form.invoiceAccessKey} onChange={(event) => setField('invoiceAccessKey', event.target.value.replace(/\D/g, ''))} /><Input label="Condição de pagamento" value={form.paymentTerms} onChange={(event) => setField('paymentTerms', event.target.value)} /><Select label="Forma de pagamento" value={form.paymentMethod} options={['', 'PIX', 'Boleto', 'Cartão', 'Transferência', 'Dinheiro', 'Prazo'].map((value) => ({ value, label: value || 'Selecione' }))} onChange={(event) => setField('paymentMethod', event.target.value)} /><div className="grid grid-cols-2 gap-2"><Input label="Frete" type="number" min="0" step="0.01" value={form.freight} onChange={(event) => setField('freight', event.target.value)} /><Input label="Desconto" type="number" min="0" step="0.01" value={form.discount} onChange={(event) => setField('discount', event.target.value)} /></div></section>
-    <section className="space-y-3 border-t border-brand-grey/15 pt-4"><div className="flex items-center justify-between"><div><h4 className="font-bold uppercase text-white">Produtos e peças</h4><p className="text-xs text-brand-grey">Cada item fica ligado ao cadastro usado nas vendas.</p></div><Button size="sm" variant="secondary" onClick={addItem}><Plus className="h-4 w-4" />Adicionar item</Button></div>{form.items.map((item, index) => <div key={index} className={`grid gap-3 border bg-black/20 p-3 md:grid-cols-[2fr_100px_130px_130px_36px] ${item.productId ? 'border-brand-grey/15' : 'border-amber-500/50'}`}><div><Select label="Produto *" value={item.productId} options={[{ value: '', label: xmlImport ? 'Associe o item do XML' : 'Selecione' }, ...products.map((product) => ({ value: product.id, label: `${product.sku || 'SEM SKU'} · ${product.name}` }))]} onChange={(event) => { const product = products.find((entry) => entry.id === event.target.value); setItem(index, { productId: event.target.value, unitCost: item.unitCost || String(product?.last_purchase_cost || product?.average_purchase_cost || '') }); }} />{!item.productId && xmlImport && <p className="mt-1 flex items-center gap-1 text-[10px] font-bold text-amber-400"><AlertTriangle className="h-3 w-3" />{item.notes.replace(/^Item \d+ do XML: /, '')}</p>}</div><Input label="Quantidade *" type="number" min="0.001" step="0.001" value={item.quantity} onChange={(event) => setItem(index, { quantity: event.target.value })} /><Input label="Custo unitário *" type="number" min="0" step="0.0001" value={item.unitCost} onChange={(event) => setItem(index, { unitCost: event.target.value })} /><Input label="Código fornecedor" value={item.supplierCode} onChange={(event) => setItem(index, { supplierCode: event.target.value })} /><button type="button" aria-label="Remover item" disabled={form.items.length === 1} onClick={() => removeItem(index)} className="mt-6 flex h-10 items-center justify-center border border-brand-red/40 text-brand-red disabled:opacity-30"><X className="h-4 w-4" /></button></div>)}</section>
+    <section className="space-y-3 border-t border-brand-grey/15 pt-4"><div className="flex items-center justify-between"><div><h4 className="font-bold uppercase text-white">Produtos e peças</h4><p className="text-xs text-brand-grey">Cada item fica ligado ao cadastro usado nas vendas.</p></div><Button size="sm" variant="secondary" onClick={addItem}><Plus className="h-4 w-4" />Adicionar item</Button></div>{form.items.map((item, index) => <div key={index} className={`grid gap-3 border bg-black/20 p-3 md:grid-cols-[2fr_100px_130px_130px_36px] ${item.productId ? 'border-brand-grey/15' : item.xmlProduct ? 'border-amber-500/50' : 'border-brand-red/60'}`}><div><Select label="Produto *" value={item.productId} options={[{ value: '', label: item.xmlProduct ? `Cadastrar automaticamente: ${item.xmlProduct.name}` : 'Selecione' }, ...products.map((product) => ({ value: product.id, label: `${product.sku || 'SEM SKU'} · ${product.name}` }))]} onChange={(event) => { const product = products.find((entry) => entry.id === event.target.value); setItem(index, { productId: event.target.value, unitCost: item.unitCost || String(product?.last_purchase_cost || product?.average_purchase_cost || '') }); }} />{!item.productId && item.xmlProduct && <p className="mt-1 flex items-center gap-1 text-[10px] font-bold text-amber-400"><AlertTriangle className="h-3 w-3" />Novo cadastro automático · {item.xmlProduct.name}</p>}</div><Input label="Quantidade *" type="number" min="0.001" step="0.001" value={item.quantity} onChange={(event) => setItem(index, { quantity: event.target.value })} /><Input label="Custo unitário *" type="number" min="0" step="0.0001" value={item.unitCost} onChange={(event) => setItem(index, { unitCost: event.target.value })} /><Input label="Código fornecedor" value={item.supplierCode} onChange={(event) => setItem(index, { supplierCode: event.target.value })} /><button type="button" aria-label="Remover item" disabled={form.items.length === 1} onClick={() => removeItem(index)} className="mt-6 flex h-10 items-center justify-center border border-brand-red/40 text-brand-red disabled:opacity-30"><X className="h-4 w-4" /></button></div>)}</section>
     <section className="grid gap-4 border-t border-brand-grey/15 pt-4 md:grid-cols-2"><div><label className="text-xs font-bold uppercase tracking-widest text-brand-grey">Observações</label><textarea value={form.notes} onChange={(event) => setField('notes', event.target.value)} className="mt-1 min-h-24 w-full border border-brand-grey/20 bg-brand-darkgrey p-3 text-sm text-white outline-none focus:border-brand-red" /></div><div className="space-y-3"><label className="block text-xs font-bold uppercase tracking-widest text-brand-grey">Notas e documentos</label><input type="file" multiple accept=".pdf,.xml,image/*,.txt" onChange={(event) => setFiles(Array.from(event.target.files || []))} className="w-full border border-brand-grey/20 bg-brand-darkgrey p-2 text-xs file:mr-2 file:border-0 file:bg-brand-red file:px-3 file:py-2 file:text-white" />{files.map((file) => <p key={`${file.name}-${file.size}`} className="text-xs text-brand-grey">{file.name} · {(file.size / 1024).toFixed(1)} KB</p>)}<div className="border border-brand-red/25 bg-brand-red/5 p-3 text-right"><p className="text-[10px] uppercase text-brand-grey">Total estimado</p><p className="text-xl font-black text-white">{money(total)}</p></div></div></section>
   </div></Modal>;
 }

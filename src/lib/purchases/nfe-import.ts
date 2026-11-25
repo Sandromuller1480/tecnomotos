@@ -12,6 +12,11 @@ export interface NfeItemData {
   supplierCode: string;
   gtin: string;
   name: string;
+  ncm: string;
+  cest: string;
+  fiscalOrigin: string;
+  commercialUnit: string;
+  taxableUnit: string;
   quantity: number;
   unitCost: number;
 }
@@ -86,13 +91,22 @@ export async function parseNfeXml(file: File): Promise<NfeImportData> {
   const itemElements = Array.from(info.getElementsByTagNameNS('*', 'det'));
   const items = itemElements.map((itemElement, index) => {
     const product = itemElement.getElementsByTagNameNS('*', 'prod')[0];
+    const icms = itemElement.getElementsByTagNameNS('*', 'ICMS')[0];
     const quantity = product ? numericValue(elementText(product, 'qCom') || elementText(product, 'qTrib')) : 0;
     const unitCost = product ? numericValue(elementText(product, 'vUnCom') || elementText(product, 'vUnTrib')) : 0;
+    const gtin = product
+      ? digitsOnly(elementText(product, 'cEANTrib')) || digitsOnly(elementText(product, 'cEAN'))
+      : '';
     return {
       lineNumber: itemElement.getAttribute('nItem') || String(index + 1),
       supplierCode: product ? elementText(product, 'cProd') : '',
-      gtin: digitsOnly(product ? elementText(product, 'cEANTrib') || elementText(product, 'cEAN') : ''),
+      gtin,
       name: product ? elementText(product, 'xProd') : '',
+      ncm: digitsOnly(product ? elementText(product, 'NCM') : ''),
+      cest: digitsOnly(product ? elementText(product, 'CEST') : ''),
+      fiscalOrigin: icms ? elementText(icms, 'orig') : '',
+      commercialUnit: product ? elementText(product, 'uCom').toUpperCase() : '',
+      taxableUnit: product ? elementText(product, 'uTrib').toUpperCase() : '',
       quantity,
       unitCost
     };
