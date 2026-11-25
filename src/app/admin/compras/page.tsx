@@ -309,18 +309,34 @@ export default function PurchasesPage() {
       if (!supplierId && xmlImport) {
         const { data: { user } } = await supabase.auth.getUser();
         const xmlSupplier = xmlImport.data.supplier;
-        const { data: createdSupplier, error: supplierError } = await supabase.from('suppliers').insert({
-          legal_name: xmlSupplier.legalName,
-          trade_name: xmlSupplier.tradeName || null,
-          document: xmlSupplier.document || null,
-          state_registration: xmlSupplier.stateRegistration || null,
-          city: xmlSupplier.city || null,
-          state: xmlSupplier.state || null,
-          active: true,
-          created_by: user?.id || null
-        }).select('id').single();
-        if (supplierError) throw supplierError;
-        supplierId = String(createdSupplier.id);
+        const { data: currentSuppliers, error: supplierLookupError } = await supabase
+          .from('suppliers')
+          .select('id,document,legal_name,trade_name')
+          .eq('active', true);
+        if (supplierLookupError) throw supplierLookupError;
+
+        const xmlDocument = normalizedDigits(xmlSupplier.document);
+        const existingSupplier = (currentSuppliers || []).find((entry) => (
+          (xmlDocument && normalizedDigits(entry.document) === xmlDocument)
+          || [entry.legal_name, entry.trade_name].some((name) => normalizedText(name) === normalizedText(xmlSupplier.legalName))
+        ));
+
+        if (existingSupplier) {
+          supplierId = String(existingSupplier.id);
+        } else {
+          const { data: createdSupplier, error: supplierError } = await supabase.from('suppliers').insert({
+            legal_name: xmlSupplier.legalName,
+            trade_name: xmlSupplier.tradeName || null,
+            document: xmlSupplier.document || null,
+            state_registration: xmlSupplier.stateRegistration || null,
+            city: xmlSupplier.city || null,
+            state: xmlSupplier.state || null,
+            active: true,
+            created_by: user?.id || null
+          }).select('id').single();
+          if (supplierError) throw supplierError;
+          supplierId = String(createdSupplier.id);
+        }
         setPurchaseForm((current) => current ? { ...current, supplierId } : current);
       }
 
@@ -473,10 +489,13 @@ function PurchaseEditor({ form, products, suppliers, files, saving, total, xmlIm
   if (!form) return null;
   const unmatchedItems = form.items.filter((item) => !item.productId).length;
   const incompleteItems = form.items.filter((item) => !item.productId && !item.xmlProduct).length;
+  const xmlSupplierName = xmlImport
+    ? xmlImport.data.supplier.tradeName || xmlImport.data.supplier.legalName
+    : '';
   const footer = xmlImport ? <><Button variant="ghost" onClick={close}>Cancelar</Button><Button variant="secondary" disabled={saving || incompleteItems > 0} onClick={() => save(false)}>Salvar rascunho</Button><Button disabled={saving || incompleteItems > 0 || !canReceive} onClick={() => save(true)}><PackageCheck className="h-4 w-4" />{saving ? 'Recebendo...' : 'Importar e receber estoque'}</Button></> : <><Button variant="ghost" onClick={close}>Cancelar</Button><Button disabled={saving} onClick={() => save(false)}>{saving ? 'Salvando...' : 'Salvar rascunho'}</Button></>;
   return <Modal isOpen onClose={close} title={xmlImport ? 'Importar compra por XML' : form.id ? 'Editar compra' : 'Nova compra de produtos'} size="xl" footer={footer}><div className="space-y-5">
     {xmlImport && <section className={`border p-4 ${unmatchedItems ? 'border-amber-500/40 bg-amber-500/5' : 'border-emerald-500/35 bg-emerald-500/5'}`}><div className="flex items-start gap-3"><FileUp className={`mt-0.5 h-5 w-5 ${unmatchedItems ? 'text-amber-400' : 'text-emerald-400'}`} /><div><h4 className="font-bold uppercase text-white">XML da NF-e reconhecido</h4><p className="mt-1 text-xs text-brand-grey">{xmlImport.fileName} · NF {xmlImport.data.invoiceNumber || '—'} · {xmlImport.data.supplier.tradeName || xmlImport.data.supplier.legalName}</p><p className={`mt-2 text-xs font-bold ${unmatchedItems ? 'text-amber-400' : 'text-emerald-400'}`}>{unmatchedItems ? `${unmatchedItems} produto(s) novo(s) serão cadastrados automaticamente ao confirmar.` : 'Todos os itens foram associados. A compra está pronta para atualizar o estoque.'}</p>{unmatchedItems > 0 && <p className="mt-1 text-xs text-brand-grey">Eles entrarão com preço de venda zerado e revisão fiscal pendente, sem aparecer na loja até a conferência.</p>}{!form.supplierId && <p className="mt-1 text-xs text-amber-400">O fornecedor do XML será cadastrado automaticamente ao confirmar.</p>}</div></div></section>}
-    <section className="grid gap-4 md:grid-cols-3"><Select label="Fornecedor *" value={form.supplierId} options={[{ value: '', label: xmlImport ? 'Fornecedor do XML (cadastro automático)' : 'Selecione' }, ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.trade_name || supplier.legal_name }))]} onChange={(event) => setField('supplierId', event.target.value)} /><Input label="Data de emissão *" type="date" value={form.issueDate} onChange={(event) => setField('issueDate', event.target.value)} /><Input label="Previsão de entrega" type="date" value={form.expectedDate} onChange={(event) => setField('expectedDate', event.target.value)} /><Input label="Número da nota" value={form.invoiceNumber} onChange={(event) => setField('invoiceNumber', event.target.value)} /><Input label="Série" value={form.invoiceSeries} onChange={(event) => setField('invoiceSeries', event.target.value)} /><Input label="Chave da NF-e (44 dígitos)" maxLength={44} value={form.invoiceAccessKey} onChange={(event) => setField('invoiceAccessKey', event.target.value.replace(/\D/g, ''))} /><Input label="Condição de pagamento" value={form.paymentTerms} onChange={(event) => setField('paymentTerms', event.target.value)} /><Select label="Forma de pagamento" value={form.paymentMethod} options={['', 'PIX', 'Boleto', 'Cartão', 'Transferência', 'Dinheiro', 'Prazo'].map((value) => ({ value, label: value || 'Selecione' }))} onChange={(event) => setField('paymentMethod', event.target.value)} /><div className="grid grid-cols-2 gap-2"><Input label="Frete" type="number" min="0" step="0.01" value={form.freight} onChange={(event) => setField('freight', event.target.value)} /><Input label="Desconto" type="number" min="0" step="0.01" value={form.discount} onChange={(event) => setField('discount', event.target.value)} /></div></section>
+    <section className="grid gap-4 md:grid-cols-3"><Select label="Fornecedor *" value={form.supplierId} options={[{ value: '', label: xmlImport ? `${xmlSupplierName} (cadastro automático)` : 'Selecione' }, ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.trade_name || supplier.legal_name }))]} onChange={(event) => setField('supplierId', event.target.value)} /><Input label="Data de emissão *" type="date" value={form.issueDate} onChange={(event) => setField('issueDate', event.target.value)} /><Input label="Previsão de entrega" type="date" value={form.expectedDate} onChange={(event) => setField('expectedDate', event.target.value)} /><Input label="Número da nota" value={form.invoiceNumber} onChange={(event) => setField('invoiceNumber', event.target.value)} /><Input label="Série" value={form.invoiceSeries} onChange={(event) => setField('invoiceSeries', event.target.value)} /><Input label="Chave da NF-e (44 dígitos)" maxLength={44} value={form.invoiceAccessKey} onChange={(event) => setField('invoiceAccessKey', event.target.value.replace(/\D/g, ''))} /><Input label="Condição de pagamento" value={form.paymentTerms} onChange={(event) => setField('paymentTerms', event.target.value)} /><Select label="Forma de pagamento" value={form.paymentMethod} options={['', 'PIX', 'Boleto', 'Cartão', 'Transferência', 'Dinheiro', 'Prazo'].map((value) => ({ value, label: value || 'Selecione' }))} onChange={(event) => setField('paymentMethod', event.target.value)} /><div className="grid grid-cols-2 gap-2"><Input label="Frete" type="number" min="0" step="0.01" value={form.freight} onChange={(event) => setField('freight', event.target.value)} /><Input label="Desconto" type="number" min="0" step="0.01" value={form.discount} onChange={(event) => setField('discount', event.target.value)} /></div></section>
     <section className="space-y-3 border-t border-brand-grey/15 pt-4"><div className="flex items-center justify-between"><div><h4 className="font-bold uppercase text-white">Produtos e peças</h4><p className="text-xs text-brand-grey">Cada item fica ligado ao cadastro usado nas vendas.</p></div><Button size="sm" variant="secondary" onClick={addItem}><Plus className="h-4 w-4" />Adicionar item</Button></div>{form.items.map((item, index) => <div key={index} className={`grid gap-3 border bg-black/20 p-3 md:grid-cols-[2fr_100px_130px_130px_36px] ${item.productId ? 'border-brand-grey/15' : item.xmlProduct ? 'border-amber-500/50' : 'border-brand-red/60'}`}><div><Select label="Produto *" value={item.productId} options={[{ value: '', label: item.xmlProduct ? `Cadastrar automaticamente: ${item.xmlProduct.name}` : 'Selecione' }, ...products.map((product) => ({ value: product.id, label: `${product.sku || 'SEM SKU'} · ${product.name}` }))]} onChange={(event) => { const product = products.find((entry) => entry.id === event.target.value); setItem(index, { productId: event.target.value, unitCost: item.unitCost || String(product?.last_purchase_cost || product?.average_purchase_cost || '') }); }} />{!item.productId && item.xmlProduct && <p className="mt-1 flex items-center gap-1 text-[10px] font-bold text-amber-400"><AlertTriangle className="h-3 w-3" />Novo cadastro automático · {item.xmlProduct.name}</p>}</div><Input label="Quantidade *" type="number" min="0.001" step="0.001" value={item.quantity} onChange={(event) => setItem(index, { quantity: event.target.value })} /><Input label="Custo unitário *" type="number" min="0" step="0.0001" value={item.unitCost} onChange={(event) => setItem(index, { unitCost: event.target.value })} /><Input label="Código fornecedor" value={item.supplierCode} onChange={(event) => setItem(index, { supplierCode: event.target.value })} /><button type="button" aria-label="Remover item" disabled={form.items.length === 1} onClick={() => removeItem(index)} className="mt-6 flex h-10 items-center justify-center border border-brand-red/40 text-brand-red disabled:opacity-30"><X className="h-4 w-4" /></button></div>)}</section>
     <section className="grid gap-4 border-t border-brand-grey/15 pt-4 md:grid-cols-2"><div><label className="text-xs font-bold uppercase tracking-widest text-brand-grey">Observações</label><textarea value={form.notes} onChange={(event) => setField('notes', event.target.value)} className="mt-1 min-h-24 w-full border border-brand-grey/20 bg-brand-darkgrey p-3 text-sm text-white outline-none focus:border-brand-red" /></div><div className="space-y-3"><label className="block text-xs font-bold uppercase tracking-widest text-brand-grey">Notas e documentos</label><input type="file" multiple accept=".pdf,.xml,image/*,.txt" onChange={(event) => setFiles(Array.from(event.target.files || []))} className="w-full border border-brand-grey/20 bg-brand-darkgrey p-2 text-xs file:mr-2 file:border-0 file:bg-brand-red file:px-3 file:py-2 file:text-white" />{files.map((file) => <p key={`${file.name}-${file.size}`} className="text-xs text-brand-grey">{file.name} · {(file.size / 1024).toFixed(1)} KB</p>)}<div className="border border-brand-red/25 bg-brand-red/5 p-3 text-right"><p className="text-[10px] uppercase text-brand-grey">Total estimado</p><p className="text-xl font-black text-white">{money(total)}</p></div></div></section>
   </div></Modal>;
