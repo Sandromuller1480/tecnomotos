@@ -37,6 +37,7 @@ DECLARE
     fiscal_origin INTEGER;
     item_quantity NUMERIC;
     item_unit_cost NUMERIC;
+    item_sale_price NUMERIC;
     item_discount NUMERIC;
 BEGIN
     IF NOT (public.is_owner(auth.uid()) OR public.has_permission(auth.uid(), CASE WHEN p_id IS NULL THEN 'purchases.create' ELSE 'purchases.update' END)) THEN
@@ -88,9 +89,10 @@ BEGIN
     LOOP
         item_quantity := COALESCE((item->>'quantity')::NUMERIC, 0);
         item_unit_cost := COALESCE((item->>'unit_cost')::NUMERIC, -1);
+        item_sale_price := COALESCE((item->>'sale_price')::NUMERIC, 0);
         item_discount := GREATEST(COALESCE((item->>'discount_amount')::NUMERIC, 0), 0);
-        IF item_quantity <= 0 OR item_unit_cost < 0 THEN
-            RAISE EXCEPTION 'Quantidade e custo dos itens devem ser válidos.';
+        IF item_quantity <= 0 OR item_unit_cost < 0 OR item_sale_price <= 0 THEN
+            RAISE EXCEPTION 'Quantidade, custo e preço de venda dos itens devem ser válidos.';
         END IF;
 
         supplier_code := NULLIF(BTRIM(COALESCE(item->>'supplier_product_code', '')), '');
@@ -171,7 +173,7 @@ BEGIN
                     unit, taxable_unit, show_in_store, preferred_supplier_id,
                     fiscal_review_notes
                 ) VALUES (
-                    product_sku, product_name, 0, item_unit_cost, 0, 0,
+                    product_sku, product_name, item_sale_price, item_unit_cost, 0, 0,
                     product_gtin, product_gtin, product_gtin IS NULL, product_ncm, product_cest,
                     fiscal_origin, fiscal_origin, commercial_unit, taxable_unit, false,
                     p_supplier_id,
@@ -179,6 +181,13 @@ BEGIN
                 ) RETURNING * INTO product_record;
             END IF;
         END IF;
+
+        UPDATE public.products SET
+            price = item_sale_price,
+            stripe_sync_status = 'pending',
+            stripe_sync_error = NULL
+        WHERE id = product_record.id
+          AND price IS DISTINCT FROM item_sale_price;
 
         INSERT INTO public.purchase_order_items (
             purchase_order_id, product_id, supplier_product_code, product_name, product_sku,
