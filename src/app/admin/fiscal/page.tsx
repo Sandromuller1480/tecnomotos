@@ -17,7 +17,8 @@ import { FileText, Plus, CheckCircle, RefreshCw, AlertCircle, XCircle } from 'lu
 
 interface FiscalDocument {
   id: string;
-  order_id: string;
+  order_id: string | null;
+  sale_id?: string | null;
   invoice_number: string;
   series: string;
   xml_url: string;
@@ -29,6 +30,25 @@ interface FiscalDocument {
   protocol?: string;
   created_at: string;
   document_type?: 'NFCE' | 'NFE' | 'NFSE';
+  sale?: FiscalSaleSummary | null;
+}
+
+interface CustomerRelation {
+  profiles?: {
+    full_name?: string | null;
+  } | Array<{
+    full_name?: string | null;
+  }> | null;
+}
+
+interface FiscalSaleSummary {
+  id: string;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  total_amount: number | string;
+  products_total?: number | string;
+  created_at: string;
+  customer?: CustomerRelation | CustomerRelation[] | null;
 }
 
 interface PendingFiscalOrder {
@@ -38,19 +58,7 @@ interface PendingFiscalOrder {
   total_amount: number | string;
   products_total?: number | string;
   created_at: string;
-  customer?: {
-    profiles?: {
-      full_name?: string | null;
-    } | Array<{
-      full_name?: string | null;
-    }> | null;
-  } | Array<{
-    profiles?: {
-      full_name?: string | null;
-    } | Array<{
-      full_name?: string | null;
-    }> | null;
-  }> | null;
+  customer?: CustomerRelation | CustomerRelation[] | null;
   order_items?: Array<{
     id: string;
     item_type: 'PRODUCT' | 'SERVICE';
@@ -79,11 +87,15 @@ interface PendingFiscalOrder {
 const money = (value: number | string) =>
   (parseFloat(String(value)) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const orderCustomerName = (order: PendingFiscalOrder) => {
+const orderCustomerName = (order: Pick<PendingFiscalOrder, 'customer_name' | 'customer'>) => {
   const customer = Array.isArray(order.customer) ? order.customer[0] : order.customer;
   const profile = Array.isArray(customer?.profiles) ? customer.profiles[0] : customer?.profiles;
   return order.customer_name?.trim() || profile?.full_name?.trim() || 'Cliente não identificado';
 };
+
+const saleDateTime = (value?: string | null) => value
+  ? new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+  : '—';
 
 const fiscalStatusLabels: Record<string, string> = {
   pending: 'Pendente',
@@ -117,8 +129,40 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
       .order('created_at', { ascending: false });
 
     if (fetchErr) throw fetchErr;
-    setDocuments(docs || []);
-    return docs || [];
+    const loadedDocuments = (docs || []) as FiscalDocument[];
+    const saleIds = [...new Set(loadedDocuments.map((doc) => doc.sale_id || doc.order_id).filter(Boolean))];
+    let salesById = new Map<string, FiscalSaleSummary>();
+
+    if (saleIds.length > 0) {
+      const { data: sales, error: salesError } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          customer_name,
+          customer_email,
+          total_amount,
+          products_total,
+          created_at,
+          customer:customers!orders_customer_id_fkey (
+            profiles!customers_id_fkey (
+              full_name
+            )
+          )
+        `)
+        .in('id', saleIds);
+      if (salesError) throw salesError;
+      salesById = new Map(((sales || []) as unknown as FiscalSaleSummary[]).map((sale) => [sale.id, sale]));
+    }
+
+    const enrichedDocuments = loadedDocuments.map((doc) => {
+      const saleId = doc.sale_id || doc.order_id;
+      return {
+        ...doc,
+        sale: saleId ? salesById.get(saleId) || null : null
+      };
+    });
+    setDocuments(enrichedDocuments);
+    return enrichedDocuments;
   }, [supabase]);
 
   const fetchPaidOrders = useCallback(async (currentDocuments: FiscalDocument[]) => {
@@ -157,12 +201,11 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
 
     if (fetchErr) throw fetchErr;
 
-    const emittedOrderIds = new Set(currentDocuments.map((doc) => doc.order_id));
+    const emittedOrderIds = new Set(currentDocuments.map((doc) => doc.sale_id || doc.order_id).filter(Boolean));
     setOrders(((data || []) as unknown as PendingFiscalOrder[])
       .filter((order) => !emittedOrderIds.has(order.id))
       .map((order) => ({
         ...order,
-        total_amount: Number(order.products_total) > 0 ? order.products_total! : order.total_amount,
         order_items: (order.order_items || []).filter((item) => item.item_type !== 'SERVICE')
       }))
       .filter((order) => (order.order_items?.length || 0) > 0));
@@ -339,13 +382,23 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
                     <Badge variant="success" className="text-[9px]">PAGO</Badge>
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white leading-tight">{orderCustomerName(order)}</h3>
-                    <p className="text-[11px] text-brand-grey mt-1 font-mono">{order.order_items?.length || 0} item(ns)</p>
+                    <p className="text-[9px] font-mono uppercase tracking-widest text-brand-grey">Cliente</p>
+                    <h3 className="mt-1 text-sm font-bold leading-tight text-white">{orderCustomerName(order)}</h3>
+                    <p className="mt-1 text-[11px] font-mono text-brand-grey">{order.order_items?.length || 0} item(ns)</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 border-t border-brand-grey/10 pt-3">
+                    <div>
+                      <p className="text-[9px] font-mono uppercase tracking-widest text-brand-grey">Data da venda</p>
+                      <p className="mt-1 text-xs font-semibold text-brand-silver">{saleDateTime(order.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-mono uppercase tracking-widest text-brand-grey">Valor da venda</p>
+                      <p className="mt-1 text-sm font-black italic text-white">{money(order.total_amount)}</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-brand-grey/10 flex items-center justify-between">
-                  <span className="text-sm font-black text-white italic">{money(order.total_amount)}</span>
+                <div className="mt-5 flex items-center justify-end border-t border-brand-grey/10 pt-4">
                   <Button variant="primary" size="sm" disabled={isEmitting !== null} onClick={() => handleEmitInvoice(order)}>
                     <Plus className="w-3.5 h-3.5 mr-1" />
                     {isEmitting === order.id ? 'Emitindo...' : 'Emitir NF-e'}
@@ -382,6 +435,9 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
                 <TableRow>
                   <TableHead>Nota / Série</TableHead>
                   <TableHead>Situação Sefaz</TableHead>
+                  <TableHead>Cliente / Venda</TableHead>
+                  <TableHead>Data da Venda</TableHead>
+                  <TableHead>Valor da Venda</TableHead>
                   <TableHead>Data de Emissão</TableHead>
                   <TableHead>Documentos</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -412,6 +468,16 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
                           </>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-xs font-bold text-white">{doc.sale ? orderCustomerName(doc.sale) : 'Cliente não identificado'}</p>
+                      <p className="mt-1 text-[10px] font-mono text-brand-grey">{doc.sale ? `VENDA #${doc.sale.id.slice(0, 8).toUpperCase()}` : 'VENDA NÃO VINCULADA'}</p>
+                    </TableCell>
+                    <TableCell className="text-xs font-mono text-brand-grey">
+                      {saleDateTime(doc.sale?.created_at)}
+                    </TableCell>
+                    <TableCell className="text-xs font-bold text-white">
+                      {doc.sale ? money(doc.sale.total_amount) : '—'}
                     </TableCell>
                     <TableCell className="text-xs text-brand-grey font-mono">
                       {new Date(doc.created_at).toLocaleString('pt-BR')}
