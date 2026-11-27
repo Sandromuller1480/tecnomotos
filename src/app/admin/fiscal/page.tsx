@@ -7,6 +7,7 @@ import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Modal } from '@/components/ui/modal';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
@@ -120,6 +121,10 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
   const [isLoading, setIsLoading] = useState(true);
   const [isEmitting, setIsEmitting] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [cancellingDocument, setCancellingDocument] = useState<FiscalDocument | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const fetchDocuments = useCallback(async () => {
     const { data: docs, error: fetchErr } = await supabase
@@ -301,24 +306,48 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
     }
   };
 
-  const handleCancel = async (doc: FiscalDocument) => {
-    const reason = window.prompt('Informe a justificativa do cancelamento da NF-e (15 a 255 caracteres):');
-    if (!reason) return;
+  const openCancelDialog = (doc: FiscalDocument) => {
+    setCancellingDocument(doc);
+    setCancelReason('');
+    setCancelError(null);
+  };
 
+  const closeCancelDialog = () => {
+    if (isCancelling) return;
+    setCancellingDocument(null);
+    setCancelReason('');
+    setCancelError(null);
+  };
+
+  const handleCancel = async () => {
+    if (!cancellingDocument || isCancelling) return;
+    const reason = cancelReason.trim();
+    if (reason.length < 15 || reason.length > 255) {
+      setCancelError('A justificativa deve conter entre 15 e 255 caracteres.');
+      return;
+    }
+
+    setIsCancelling(true);
+    setCancelError(null);
     try {
-      info('Cancelando NF-e', `Enviando cancelamento de ${doc.reference || doc.id}.`);
+      info('Cancelando NF-e', `Enviando cancelamento de ${cancellingDocument.reference || cancellingDocument.id}.`);
       const response = await fetch('/api/fiscal/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId: doc.id, reason }),
+        body: JSON.stringify({ documentId: cancellingDocument.id, reason }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao cancelar NF-e.');
       success('NF-e cancelada', `Documento fiscal: ${fiscalStatusLabels[result.document.status] || result.document.status}.`);
+      setCancellingDocument(null);
+      setCancelReason('');
       await loadFiscalData();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Falha no cancelamento.';
+      setCancelError(msg);
       error('Cancelamento fiscal falhou', msg);
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -505,7 +534,7 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
                           Consultar
                         </Button>
                         {['EMITTED', 'authorized'].includes(doc.status) && (
-                          <Button variant="secondary" size="sm" onClick={() => handleCancel(doc)}>
+                          <Button variant="secondary" size="sm" onClick={() => openCancelDialog(doc)}>
                             Cancelar
                           </Button>
                         )}
@@ -530,6 +559,64 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
           }}
         />
       )}
+
+      <Modal
+        isOpen={Boolean(cancellingDocument)}
+        onClose={closeCancelDialog}
+        title="Cancelar nota fiscal"
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="ghost" disabled={isCancelling} onClick={closeCancelDialog}>
+              Voltar
+            </Button>
+            <Button type="button" variant="danger" disabled={isCancelling || cancelReason.trim().length < 15} onClick={() => void handleCancel()}>
+              {isCancelling ? 'Cancelando...' : 'Confirmar cancelamento'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex gap-3 border border-brand-red/35 bg-brand-red/5 p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-brand-red" />
+            <div>
+              <p className="font-bold uppercase text-white">Atenção: esta ação será enviada à SEFAZ</p>
+              <p className="mt-1 text-xs leading-relaxed text-brand-silver">
+                {cancellingDocument
+                  ? `NF-e nº ${cancellingDocument.invoice_number || 'não informado'} · série ${cancellingDocument.series || 'não informada'}.`
+                  : 'Confirme os dados da nota fiscal.'}
+              </p>
+            </div>
+          </div>
+
+          <label className="block space-y-2">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-grey">
+              Justificativa do cancelamento *
+            </span>
+            <textarea
+              autoFocus
+              value={cancelReason}
+              maxLength={255}
+              disabled={isCancelling}
+              onChange={(event) => {
+                setCancelReason(event.target.value);
+                if (cancelError) setCancelError(null);
+              }}
+              placeholder="Descreva o motivo do cancelamento com no mínimo 15 caracteres"
+              className={`min-h-32 w-full resize-y border bg-brand-darkgrey p-3 text-sm text-white outline-none transition-colors placeholder:text-brand-grey/60 focus:border-brand-red ${cancelError ? 'border-brand-red' : 'border-brand-grey/25'}`}
+            />
+          </label>
+
+          <div className="flex items-start justify-between gap-3 text-[10px] font-mono">
+            <p className={cancelError ? 'text-red-300' : 'text-brand-grey'}>
+              {cancelError || 'A justificativa deve ter entre 15 e 255 caracteres.'}
+            </p>
+            <span className={cancelReason.length >= 15 ? 'text-emerald-400' : 'text-brand-grey'}>
+              {cancelReason.length}/255
+            </span>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
