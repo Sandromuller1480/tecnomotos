@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { createClient } from '@/lib/supabase/server';
 import { buildSaleReportPdf, type SaleReportDetail } from '@/lib/reports/report-pdf';
 
@@ -14,6 +15,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     required_permission: 'orders.view'
   });
   if (!hasPermission) return Response.json({ error: 'Acesso negado.' }, { status: 403 });
+
+  const { data: hasFiscalPermission } = await supabase.rpc('has_permission', {
+    user_uuid: user.id,
+    required_permission: 'fiscal.view'
+  });
 
   const { id } = await params;
   const { data, error } = await supabase
@@ -66,6 +72,54 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (error || !data) return Response.json({ error: 'Venda não encontrada.' }, { status: 404 });
 
+  const { data: fiscalDocument } = hasFiscalPermission
+    ? await supabase
+        .from('fiscal_documents')
+        .select('id,status,invoice_number,series,access_key,authorized_at,danfe_url,provider,environment,created_at')
+        .eq('sale_id', id)
+        .in('document_type', ['NFE', 'NFCE'])
+        .in('status', ['authorized', 'EMITTED'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
+  const url = new URL(request.url);
+  if (url.searchParams.get('format') === 'danfe') {
+    if (!hasFiscalPermission) return Response.json({ error: 'Acesso fiscal negado.' }, { status: 403 });
+    if (!fiscalDocument?.danfe_url) return Response.json({ error: 'DANFE não disponível para esta venda.' }, { status: 404 });
+
+    const target = new URL(fiscalDocument.danfe_url, url.origin);
+    const allowedHosts = new Set([url.hostname, 'homologacao.focusnfe.com.br', 'api.focusnfe.com.br']);
+    if (!['http:', 'https:'].includes(target.protocol) || !allowedHosts.has(target.hostname)) {
+      return Response.json({ error: 'Endereço do DANFE não autorizado.' }, { status: 400 });
+    }
+
+    const headers = new Headers({ Accept: 'application/pdf' });
+    if (target.hostname.endsWith('.focusnfe.com.br')) {
+      const token = fiscalDocument.environment === 'production'
+        ? process.env.FOCUS_NFE_PRODUCTION_TOKEN
+        : process.env.FOCUS_NFE_HOMOLOGATION_TOKEN;
+      if (token) headers.set('Authorization', `Basic ${Buffer.from(`${token}:`).toString('base64')}`);
+    }
+
+    const danfeResponse = await fetch(target, { headers, cache: 'no-store' });
+    if (!danfeResponse.ok || !danfeResponse.body) {
+      return Response.json({ error: 'Não foi possível obter o DANFE no provedor fiscal.' }, { status: 502 });
+    }
+
+    const disposition = url.searchParams.get('disposition') === 'attachment' ? 'attachment' : 'inline';
+    const fileNumber = fiscalDocument.invoice_number || id.slice(0, 8);
+    return new Response(danfeResponse.body, {
+      status: 200,
+      headers: {
+        'Content-Type': danfeResponse.headers.get('content-type') || 'application/pdf',
+        'Content-Disposition': `${disposition}; filename="nfe-${fileNumber}.pdf"`,
+        'Cache-Control': 'private, no-store'
+      }
+    });
+  }
+
   const customer = one(data.customer);
   const profile = one(customer?.profiles);
   const addresses = Array.isArray(customer?.addresses) ? customer.addresses : customer?.addresses ? [customer.addresses] : [];
@@ -88,6 +142,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     createdAt: data.created_at,
     notes: data.notes,
     total: Number(data.total_amount) || 0,
+    fiscalDocument: fiscalDocument
+      ? {
+          id: fiscalDocument.id,
+          status: fiscalDocument.status,
+          number: fiscalDocument.invoice_number,
+          series: fiscalDocument.series,
+          accessKey: fiscalDocument.access_key,
+          authorizedAt: fiscalDocument.authorized_at,
+          hasDanfe: Boolean(fiscalDocument.danfe_url)
+        }
+      : null,
     serviceOrder: serviceOrder
       ? { id: serviceOrder.id, status: serviceOrder.status }
       : null,
@@ -134,7 +199,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     })
   };
 
-  const url = new URL(request.url);
   if (url.searchParams.get('format') === 'pdf') {
     return new Response(buildSaleReportPdf(detail), {
       headers: {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download, FileText, Package, Printer, ReceiptText, Wrench, X } from 'lucide-react';
+import { Download, Eye, FileText, Package, Printer, ReceiptText, Wrench, X } from 'lucide-react';
 import type { SaleReportDetail, ServiceReportDetail } from '@/lib/reports/report-pdf';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -93,7 +93,7 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
   const { success, error } = useToast();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [printingPdf, setPrintingPdf] = useState<'report' | 'fiscal' | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
   const [emittingFiscal, setEmittingFiscal] = useState<'products' | 'services' | null>(null);
   const [issuedFiscal, setIssuedFiscal] = useState<{ products?: boolean; services?: boolean }>({});
@@ -123,6 +123,7 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
           const loaded = result as Detail;
           setDetail(loaded);
           if (loaded.kind === 'sale') {
+            setIssuedFiscal((current) => ({ ...current, products: Boolean(loaded.fiscalDocument) }));
             const context = loaded.fiscalContext;
             setFiscalForm({
               issuerUf: context?.issuerUf || 'MT',
@@ -156,17 +157,20 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
     document.body.removeChild(link);
   };
 
-  const printPdf = async () => {
-    setIsPrinting(true);
+  const printPdf = async (source: 'report' | 'fiscal' = 'report') => {
+    setPrintingPdf(source);
     setPrintError(null);
 
     try {
-      const response = await fetch(`${baseUrl}?format=pdf`, { cache: 'no-store' });
+      const pdfUrl = source === 'fiscal'
+        ? `${baseUrl}?format=danfe&disposition=inline`
+        : `${baseUrl}?format=pdf`;
+      const response = await fetch(pdfUrl, { cache: 'no-store' });
       if (!response.ok) throw new Error('Não foi possível preparar o documento para impressão.');
 
-      const pdfUrl = URL.createObjectURL(await response.blob());
+      const objectUrl = URL.createObjectURL(await response.blob());
       const frame = document.createElement('iframe');
-      frame.title = kind === 'sale' ? 'Impressão da venda' : 'Impressão do serviço';
+      frame.title = source === 'fiscal' ? 'Impressão da nota fiscal' : kind === 'sale' ? 'Impressão da venda' : 'Impressão do serviço';
       frame.style.position = 'fixed';
       frame.style.right = '0';
       frame.style.bottom = '0';
@@ -175,7 +179,7 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
       frame.style.border = '0';
 
       const cleanup = () => {
-        URL.revokeObjectURL(pdfUrl);
+        URL.revokeObjectURL(objectUrl);
         frame.remove();
       };
 
@@ -185,24 +189,39 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
           if (!printWindow) {
             cleanup();
             setPrintError('O navegador não conseguiu abrir a impressão do documento.');
-            setIsPrinting(false);
+            setPrintingPdf(null);
             return;
           }
 
           printWindow.addEventListener('afterprint', cleanup, { once: true });
           printWindow.focus();
           printWindow.print();
-          setIsPrinting(false);
+          setPrintingPdf(null);
           window.setTimeout(cleanup, 60_000);
         }, 300);
       };
 
-      frame.src = pdfUrl;
+      frame.src = objectUrl;
       document.body.appendChild(frame);
     } catch (error) {
       setPrintError(error instanceof Error ? error.message : 'Não foi possível preparar o documento para impressão.');
-      setIsPrinting(false);
+      setPrintingPdf(null);
     }
+  };
+
+  const viewFiscalPdf = () => {
+    const opened = window.open(`${baseUrl}?format=danfe&disposition=inline`, '_blank');
+    if (opened) opened.opener = null;
+    else error('Visualização bloqueada', 'Permita a abertura de uma nova aba para visualizar a nota fiscal.');
+  };
+
+  const downloadFiscalPdf = () => {
+    const link = document.createElement('a');
+    link.href = `${baseUrl}?format=danfe&disposition=attachment`;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const emitFiscalDocument = async (documentKind: 'products' | 'services') => {
@@ -266,6 +285,23 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
       setIssuedFiscal((current) => ({ ...current, [documentKind]: true }));
       const documentStatus = String(result.document?.status || '').toLowerCase();
       const authorized = ['authorized', 'emitted'].includes(documentStatus);
+      if (authorized && documentKind === 'products') {
+        const fiscalDocument = result.document as Record<string, unknown>;
+        setDetail((current) => current?.kind === 'sale'
+          ? {
+              ...current,
+              fiscalDocument: {
+                id: String(fiscalDocument.id || ''),
+                status: String(fiscalDocument.status || 'authorized'),
+                number: typeof fiscalDocument.invoice_number === 'string' ? fiscalDocument.invoice_number : null,
+                series: typeof fiscalDocument.series === 'string' ? fiscalDocument.series : null,
+                accessKey: typeof fiscalDocument.access_key === 'string' ? fiscalDocument.access_key : null,
+                authorizedAt: typeof fiscalDocument.authorized_at === 'string' ? fiscalDocument.authorized_at : null,
+                hasDanfe: typeof fiscalDocument.danfe_url === 'string' && fiscalDocument.danfe_url.length > 0
+              }
+            }
+          : current);
+      }
       success(
         authorized
           ? (documentKind === 'products' ? 'Nota de produtos emitida' : 'NFS-e emitida')
@@ -344,9 +380,9 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
                     <Button type="button" onClick={downloadPdf}>
                       <Download className="h-4 w-4" /> Baixar PDF completo
                     </Button>
-                    <Button type="button" variant="secondary" onClick={() => void printPdf()} disabled={isPrinting}>
+                    <Button type="button" variant="secondary" onClick={() => void printPdf('report')} disabled={printingPdf !== null}>
                       <Printer className="h-4 w-4" />
-                      {isPrinting ? 'Preparando...' : kind === 'sale' ? 'Imprimir venda' : 'Imprimir serviço'}
+                      {printingPdf === 'report' ? 'Preparando...' : kind === 'sale' ? 'Imprimir venda' : 'Imprimir serviço'}
                     </Button>
                   </div>
                   {printError && <p className="max-w-md text-right text-[10px] text-red-300">{printError}</p>}
@@ -373,16 +409,31 @@ export function ReportDetailModal({ kind, id, onClose, onFiscalIssued }: ReportD
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {hasProducts && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => void emitFiscalDocument('products')}
-                            disabled={!productReady || emittingFiscal !== null || issuedFiscal.products}
-                            title={!productReady ? 'Disponível após a confirmação do pagamento' : 'Emitir nota fiscal dos produtos'}
-                          >
-                            <ReceiptText className="h-4 w-4" />
-                            {issuedFiscal.products ? 'Nota de produtos emitida' : emittingFiscal === 'products' ? 'Emitindo...' : 'Emitir nota de produtos'}
-                          </Button>
+                          <>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => void emitFiscalDocument('products')}
+                              disabled={!productReady || emittingFiscal !== null || issuedFiscal.products}
+                              title={!productReady ? 'Disponível após a confirmação do pagamento' : 'Emitir nota fiscal dos produtos'}
+                            >
+                              <ReceiptText className="h-4 w-4" />
+                              {issuedFiscal.products ? 'Nota de produtos emitida' : emittingFiscal === 'products' ? 'Emitindo...' : 'Emitir nota de produtos'}
+                            </Button>
+                            {detail.fiscalDocument?.hasDanfe && (
+                              <>
+                                <Button type="button" size="sm" variant="secondary" className="px-2.5" onClick={viewFiscalPdf} aria-label="Visualizar nota fiscal" title="Visualizar nota fiscal">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button type="button" size="sm" variant="secondary" className="px-2.5" onClick={() => void printPdf('fiscal')} disabled={printingPdf !== null} aria-label="Imprimir nota fiscal" title="Imprimir nota fiscal">
+                                  <Printer className="h-4 w-4" />
+                                </Button>
+                                <Button type="button" size="sm" variant="secondary" className="px-2.5" onClick={downloadFiscalPdf} aria-label="Baixar nota fiscal" title="Baixar nota fiscal">
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                          </>
                         )}
                         {hasServices && (
                           <Button

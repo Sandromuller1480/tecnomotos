@@ -20,6 +20,15 @@ export interface SaleReportDetail {
   notes?: string | null;
   total: number;
   customer: ReportParty;
+  fiscalDocument?: {
+    id: string;
+    status: string;
+    number?: string | null;
+    series?: string | null;
+    accessKey?: string | null;
+    authorizedAt?: string | null;
+    hasDanfe: boolean;
+  } | null;
   serviceOrder?: {
     id: string;
     status: string;
