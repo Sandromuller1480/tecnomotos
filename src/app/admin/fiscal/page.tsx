@@ -111,9 +111,12 @@ const fiscalStatusLabels: Record<string, string> = {
   ERROR: 'Erro'
 };
 
+const documentBlocksNewEmission = (document: FiscalDocument) =>
+  ['pending', 'processing', 'authorized', 'contingency', 'cancelled', 'EMITTED', 'CANCELLED'].includes(document.status);
+
 export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { success, error, info } = useToast();
 
   const [documents, setDocuments] = useState<FiscalDocument[]>([]);
@@ -206,7 +209,10 @@ export function FiscalProductsPanel({ embedded = false }: { embedded?: boolean }
 
     if (fetchErr) throw fetchErr;
 
-    const emittedOrderIds = new Set(currentDocuments.map((doc) => doc.sale_id || doc.order_id).filter(Boolean));
+    const emittedOrderIds = new Set(currentDocuments
+      .filter(documentBlocksNewEmission)
+      .map((doc) => doc.sale_id || doc.order_id)
+      .filter(Boolean));
     setOrders(((data || []) as unknown as PendingFiscalOrder[])
       .filter((order) => !emittedOrderIds.has(order.id))
       .map((order) => ({
